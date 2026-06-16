@@ -7,394 +7,579 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f7f2;
+      --bg: #f6f7f4;
       --panel: #ffffff;
-      --ink: #171b1f;
-      --muted: #68707a;
-      --line: #dfe3df;
+      --ink: #161a1d;
+      --muted: #69717a;
+      --faint: #9aa0a6;
+      --line: #e2e5e0;
+      --line-2: #cfd4ce;
       --accent: #146c5f;
-      --accent-2: #3d5afe;
-      --warn: #ad5b00;
-      --bad: #a4343a;
-      --good: #217a41;
-      --shadow: 0 10px 28px rgba(22, 28, 35, .08);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --accent-2: #2f4bd6;
+      --good: #1c7a45;
+      --good-bg: #e7f3ea;
+      --bad: #b03232;
+      --bad-bg: #fbeaea;
+      --neutral-bg: #f0f1ee;
+      --shadow: 0 8px 24px rgba(22, 28, 35, .07);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--ink);
-      background: linear-gradient(180deg, #fbfbf8 0, var(--bg) 48%, #eef3f1 100%);
-      letter-spacing: 0;
+      margin: 0; min-height: 100vh; color: var(--ink);
+      background: linear-gradient(180deg, #fbfbf9 0, var(--bg) 50%, #eef2ef 100%);
     }
-    button, select { font: inherit; }
-    .app {
-      display: grid;
-      grid-template-columns: 248px 1fr;
-      min-height: 100vh;
-    }
-    aside {
-      border-right: 1px solid var(--line);
-      padding: 18px 14px;
-      background: rgba(255,255,255,.72);
-      backdrop-filter: blur(14px);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 18px;
-      font-weight: 760;
-      font-size: 18px;
-    }
-    .mark {
-      width: 30px;
-      height: 30px;
-      display: grid;
-      place-items: center;
-      border-radius: 8px;
-      color: white;
-      background: linear-gradient(135deg, var(--accent), #202b61);
-      font-size: 15px;
-    }
-    .sidebar-actions { display: grid; gap: 8px; margin-bottom: 14px; }
-    .primary, .secondary, .ticker-btn, .tab {
-      border: 1px solid var(--line);
-      background: var(--panel);
-      color: var(--ink);
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    .primary {
-      background: var(--accent);
-      color: white;
-      border-color: var(--accent);
-      padding: 10px 12px;
-      font-weight: 700;
-    }
-    .secondary { padding: 9px 10px; color: var(--muted); }
-    .ticker-list { display: grid; gap: 7px; }
-    .ticker-btn {
-      text-align: left;
-      padding: 10px;
-      min-height: 62px;
-      transition: transform .12s ease, border-color .12s ease;
-    }
-    .ticker-btn:hover { transform: translateY(-1px); border-color: #aeb8b4; }
-    .ticker-btn.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-    .ticker-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-    .ticker-symbol { font-weight: 760; }
-    .price { font-variant-numeric: tabular-nums; }
-    .small { color: var(--muted); font-size: 12px; line-height: 1.35; }
-    main { padding: 18px 22px 28px; overflow: auto; }
-    header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 16px; }
-    h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.1; }
-    .subtitle { color: var(--muted); max-width: 780px; line-height: 1.4; }
-    .date-chip {
-      padding: 8px 10px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255,255,255,.68);
-      color: var(--muted);
-      white-space: nowrap;
-    }
-    .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
-    .metric, .panel, .card {
-      background: rgba(255,255,255,.82);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-    }
-    .metric { padding: 11px 12px; min-height: 78px; }
-    .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    .value { font-size: 20px; font-weight: 760; font-variant-numeric: tabular-nums; }
-    .tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 12px 0; }
-    .tab { padding: 8px 10px; color: var(--muted); }
-    .tab.active { background: #16201f; color: white; border-color: #16201f; }
-    .panel { padding: 14px; }
-    .two-col { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
-    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    button, select, input { font: inherit; color: inherit; }
+    a { color: inherit; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 22px 48px; }
+    .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 760; font-size: 18px; }
+    .mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #fff;
+      background: linear-gradient(135deg, var(--accent), #1f2b60); font-size: 14px; }
+    .brand small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+    .status { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted);
+      background: rgba(255,255,255,.7); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+    .dot.spin { background: var(--accent-2); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* toolbar */
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px;
+      background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 13px; }
+    .search input { border: 0; outline: 0; background: transparent; width: 100%; font-size: 14px; }
+    .search svg { color: var(--faint); flex-shrink: 0; }
+    select.sort { background: var(--panel); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 12px; font-size: 13px; cursor: pointer; }
+
+    /* board */
+    .board { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+    .grid-row { display: grid; grid-template-columns: 34px 1.5fr 92px 1.5fr 78px 96px 70px; gap: 10px; align-items: center; padding: 12px 16px; }
+    .grid-head { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: var(--faint);
+      background: #fafbf9; border-bottom: 1px solid var(--line); }
+    .board-body .grid-row { border-bottom: 1px solid var(--line); cursor: pointer; transition: background .1s; }
+    .board-body .grid-row:last-child { border-bottom: 0; }
+    .board-body .grid-row:hover { background: #f3f6f3; }
+    .row-good { background: linear-gradient(90deg, rgba(28,122,69,.07), transparent 60%); }
+    .row-bad { background: linear-gradient(90deg, rgba(176,50,50,.07), transparent 60%); }
+    .rank { color: var(--faint); font-size: 13px; font-variant-numeric: tabular-nums; }
+    .sym { font-weight: 760; font-size: 15px; }
+    .co-name { color: var(--muted); font-size: 12px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .num { font-variant-numeric: tabular-nums; text-align: right; }
+    .exp { font-weight: 700; font-size: 15px; }
+    .exp.good { color: var(--good); } .exp.bad { color: var(--bad); } .exp.flat { color: var(--muted); }
+    .rangebar { position: relative; height: 7px; border-radius: 4px; background: var(--neutral-bg); }
+    .rangebar > span { position: absolute; top: 0; height: 7px; border-radius: 4px; }
+    .rangebar .now { position: absolute; top: -3px; width: 2px; height: 13px; background: var(--ink); border-radius: 1px; }
+    .rb-lbl { font-size: 10px; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .conv { display: flex; gap: 3px; justify-content: center; }
+    .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--line-2); }
+    .pip.on.good { background: var(--good); } .pip.on.bad { background: var(--bad); } .pip.on.flat { background: var(--muted); }
+    .spark { display: block; }
+    .verdict-pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-align: center; white-space: nowrap; }
+    .v-good { background: var(--good-bg); color: var(--good); }
+    .v-bad { background: var(--bad-bg); color: var(--bad); }
+    .v-flat { background: var(--neutral-bg); color: var(--muted); }
+    .section-label { padding: 8px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); background: #fafbf9; border-bottom: 1px solid var(--line); }
+
+    /* company view */
+    .company { display: grid; grid-template-columns: 232px 1fr; gap: 16px; }
+    .rail { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 8px; align-self: start; }
+    .back { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--accent-2); cursor: pointer; padding: 8px; border-radius: 8px; }
+    .back:hover { background: #f1f4f1; }
+    .rail-row { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 8px; cursor: pointer; }
+    .rail-row:hover { background: #f3f6f3; }
+    .rail-row.active { background: #eef3f1; box-shadow: inset 2px 0 0 var(--accent); }
+    .rail-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .rail-sym { flex: 1; font-weight: 700; font-size: 13px; }
+    .rail-exp { font-size: 12px; font-variant-numeric: tabular-nums; }
+    main { min-width: 0; }
+    .co-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .co-head h1 { margin: 0; font-size: 25px; }
+    .co-head .price { font-size: 18px; font-variant-numeric: tabular-nums; color: var(--muted); }
+    .banner { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; margin-bottom: 14px; }
+    .banner.good { background: var(--good-bg); } .banner.bad { background: var(--bad-bg); } .banner.flat { background: var(--neutral-bg); }
+    .banner .lab { font-size: 17px; font-weight: 800; letter-spacing: .02em; }
+    .banner.good .lab { color: var(--good); } .banner.bad .lab { color: var(--bad); } .banner.flat .lab { color: var(--muted); }
+    .banner .line { font-size: 13.5px; line-height: 1.4; }
+    .banner.good .line { color: #185f37; } .banner.bad .line { color: #8c2828; } .banner.flat .line { color: var(--ink); }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
+    .tab { padding: 8px 13px; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 13px; }
+    .tab.active { background: #16201f; color: #fff; border-color: #16201f; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+    .card + .card, .stack > * + * { margin-top: 12px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); margin-bottom: 8px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .metric { background: #fafbf9; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+    .metric .m-lab { font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    .metric .m-val { font-size: 19px; font-weight: 760; font-variant-numeric: tabular-nums; }
+    canvas.chart, canvas.cone { width: 100%; display: block; background: #fbfcfa; border: 1px solid var(--line); border-radius: 10px; }
+    .why { font-size: 14px; line-height: 1.6; color: var(--ink); }
+    .hbar-row { display: grid; grid-template-columns: 52px 1fr 84px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+    .hbar-row:last-child { border-bottom: 0; }
+    .hbar-h { font-weight: 760; font-size: 13px; }
+    .hbar-h small { display: block; font-weight: 500; color: var(--faint); font-size: 10.5px; }
+    .hbar { position: relative; height: 24px; }
+    .hbar .track { position: absolute; top: 9px; left: 0; right: 0; height: 6px; border-radius: 4px; background: var(--neutral-bg); }
+    .hbar .fill { position: absolute; top: 9px; height: 6px; border-radius: 4px; background: linear-gradient(90deg, #c7d6cf, var(--accent)); }
+    .hbar .base { position: absolute; top: 3px; width: 2px; height: 18px; background: var(--accent); border-radius: 1px; }
+    .hbar .now { position: absolute; top: 1px; width: 2px; height: 22px; background: var(--ink); border-radius: 1px; }
+    .hbar-end { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
     .table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .table th, .table td { padding: 9px 7px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-    .table th { color: var(--muted); font-weight: 680; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 3px 7px;
-      font-size: 12px;
-      border: 1px solid var(--line);
-      color: var(--muted);
-      background: white;
-    }
-    .badge.high { color: var(--good); border-color: #a8d6ba; }
-    .badge.medium { color: var(--warn); border-color: #e5c391; }
-    .badge.low { color: var(--bad); border-color: #e2a4a8; }
-    .chart { width: 100%; height: 220px; display: block; background: #fbfcfa; border: 1px solid var(--line); border-radius: 8px; }
-    .hist { height: 220px; display: flex; align-items: end; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfa; }
-    .bar { flex: 1; min-width: 8px; background: linear-gradient(180deg, var(--accent-2), var(--accent)); border-radius: 5px 5px 2px 2px; position: relative; }
-    .bar:hover::after {
-      content: attr(data-tip);
-      position: absolute;
-      left: 50%;
-      bottom: calc(100% + 6px);
-      transform: translateX(-50%);
-      background: #111;
-      color: white;
-      padding: 5px 7px;
-      border-radius: 6px;
-      font-size: 11px;
-      white-space: nowrap;
-      z-index: 2;
-    }
-    .log { white-space: pre-wrap; max-height: 160px; overflow: auto; background: #111817; color: #d7eee8; border-radius: 8px; padding: 10px; font-size: 12px; }
-    .muted { color: var(--muted); }
-    .stack { display: grid; gap: 10px; }
-    .card { padding: 11px; box-shadow: none; }
-    .empty { color: var(--muted); padding: 24px; text-align: center; }
-    @media (max-width: 920px) {
-      .app { grid-template-columns: 1fr; }
-      aside { position: static; border-right: 0; border-bottom: 1px solid var(--line); }
-      .ticker-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .metric-grid, .two-col, .three-col { grid-template-columns: 1fr; }
-      header { display: grid; }
+    .table th, .table td { padding: 9px 7px; border-bottom: 1px solid var(--line); text-align: left; }
+    .table th { color: var(--muted); font-weight: 680; font-size: 12px; }
+    .badge { display: inline-flex; border-radius: 999px; padding: 2px 8px; font-size: 11.5px; border: 1px solid var(--line); color: var(--muted); }
+    .badge.high { color: var(--good); border-color: #a8d6ba; } .badge.medium { color: #9a6212; border-color: #e5c391; } .badge.low { color: var(--bad); border-color: #e2a4a8; }
+    .btn { border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 9px; padding: 9px 14px; font-weight: 700; cursor: pointer; font-size: 13px; }
+    .btn.ghost { background: var(--panel); color: var(--accent); }
+    .muted { color: var(--muted); } .empty { color: var(--muted); padding: 26px; text-align: center; }
+    .hist { height: 200px; display: flex; align-items: end; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfa; }
+    .bar { flex: 1; min-width: 7px; background: linear-gradient(180deg, var(--accent-2), var(--accent)); border-radius: 5px 5px 2px 2px; position: relative; }
+    .bar:hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
+      background: #111; color: #fff; padding: 5px 7px; border-radius: 6px; font-size: 11px; white-space: nowrap; z-index: 2; }
+    .two-col { display: grid; grid-template-columns: 1.25fr .75fr; gap: 12px; }
+    .hide { display: none !important; }
+    @media (max-width: 900px) {
+      .company { grid-template-columns: 1fr; } .rail { display: none; }
+      .grid-row { grid-template-columns: 28px 1.4fr 70px 70px 84px; }
+      .grid-row .col-range, .grid-row .col-conv { display: none; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside>
-      <div class="brand"><div class="mark">EQ</div><div>Equities<br><span class="small">Decision Support</span></div></div>
-      <div class="sidebar-actions">
-        <button class="primary" id="refreshBtn" title="Fetch fresh prices, SEC facts, and market metadata">Refresh Data</button>
-        <button class="secondary" id="evaluateBtn" title="Compare mature forecasts with actual price history">Evaluate Forecasts</button>
-      </div>
-      <div class="ticker-list" id="tickerList"></div>
-    </aside>
-    <main>
-      <header>
-        <div>
-          <h1 id="title">Loading...</h1>
-          <div class="subtitle" id="subtitle">Transparent forecasts, immutable forecast records, and post-horizon accuracy checks.</div>
-        </div>
-        <div class="date-chip" id="dateChip">Current date</div>
-      </header>
-      <section class="metric-grid" id="metricGrid"></section>
-      <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="overview">Overview</button>
-        <button class="tab" data-tab="forecasts">Forecasts</button>
-        <button class="tab" data-tab="history">Forecast History</button>
-        <button class="tab" data-tab="accuracy">Model Accuracy</button>
-        <button class="tab" data-tab="price">Price Action</button>
-      </nav>
-      <section class="panel" id="content"></section>
-      <div class="log" id="log" style="display:none"></div>
-    </main>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand"><div class="mark">EQ</div><div>Equities<small>Decision Support</small></div></div>
+      <div class="status" id="status"><span class="dot" id="statusDot"></span><span id="statusText">loading…</span></div>
+    </div>
+    <div id="root"></div>
   </div>
 
   <script>
-    const state = { summary: null, selected: null, detail: null, tab: "overview", accuracy: null };
+    const state = {
+      board: null, detail: {}, accuracy: null,
+      view: "board", selected: null, tab: "snapshot",
+      query: "", sort: "signal", filter: "all",
+      lastRefresh: null, refreshing: false,
+    };
     const $ = (id) => document.getElementById(id);
-    const money = (n) => Number.isFinite(Number(n)) ? "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "unavailable";
-    const pct = (n) => Number.isFinite(Number(n)) ? (Number(n) * 100).toFixed(1) + "%" : "unavailable";
+    const fmtNum = (n, d = 2) => Number.isFinite(Number(n)) ? Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : null;
+    const money = (n) => { const v = fmtNum(n); return v === null ? "—" : "$" + v; };
+    const money0 = (n) => Number.isFinite(Number(n)) ? "$" + Math.round(Number(n)).toLocaleString() : "—";
+    const pct = (n) => Number.isFinite(Number(n)) ? (Number(n) * 100).toFixed(1) + "%" : "—";
+    const signed = (n) => Number.isFinite(Number(n)) ? (n >= 0 ? "+" : "−") + Math.abs(Number(n) * 100).toFixed(1) + "%" : "—";
     const compact = (n) => {
       n = Number(n);
-      if (!Number.isFinite(n)) return "unavailable";
-      if (Math.abs(n) >= 1e12) return (n / 1e12).toFixed(2) + "T";
-      if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + "B";
-      if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + "M";
+      if (!Number.isFinite(n)) return "—";
+      const a = Math.abs(n);
+      if (a >= 1e12) return (n / 1e12).toFixed(2) + "T";
+      if (a >= 1e9) return (n / 1e9).toFixed(2) + "B";
+      if (a >= 1e6) return (n / 1e6).toFixed(2) + "M";
       return n.toLocaleString();
     };
+    const esc = (v) => String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
+
     async function api(path, options) {
       const res = await fetch(path, options);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
       return data;
     }
-    function showLog(text) {
-      $("log").style.display = "block";
-      $("log").textContent = text;
+
+    function verdictOf(exp) {
+      if (!Number.isFinite(Number(exp))) return { label: "NO SIGNAL", tone: "flat" };
+      if (exp >= 0.10) return { label: "BUY", tone: "good" };
+      if (exp >= 0.03) return { label: "ACCUMULATE", tone: "good" };
+      if (exp > -0.03) return { label: "HOLD", tone: "flat" };
+      if (exp > -0.10) return { label: "REDUCE", tone: "bad" };
+      return { label: "SELL", tone: "bad" };
     }
-    async function loadSummary() {
-      state.summary = await api("/api/summary");
-      if (!state.selected && state.summary.companies.length) state.selected = state.summary.companies[0].ticker;
-      renderSidebar();
-      $("dateChip").textContent = `Today: ${state.summary.current_date} | ${state.summary.model_version}`;
-      await loadCompany(state.selected);
+    const toneCls = { good: "good", bad: "bad", flat: "flat" };
+
+    // Board filters — add a category here and it appears in the dropdown automatically.
+    const FILTERS = [
+      { key: "all", label: "All", test: () => true },
+      { key: "buys", label: "Buys", test: r => Number.isFinite(r.signal?.expected_return_13w) && r.signal.expected_return_13w >= 0.03 },
+      { key: "sells", label: "Sells", test: r => Number.isFinite(r.signal?.expected_return_13w) && r.signal.expected_return_13w <= -0.03 },
+    ];
+    const filterFor = (key) => FILTERS.find(f => f.key === key) || FILTERS[0];
+
+    /* ---------- data ---------- */
+    async function loadBoard() {
+      state.board = await api("/api/board");
+      state.lastRefresh = state.lastRefresh || Date.now();
+      renderStatus();
     }
-    async function loadCompany(ticker) {
-      state.selected = ticker;
-      state.detail = await api(`/api/company/${ticker}`);
-      renderSidebar();
-      render();
+    async function loadDetail(ticker) {
+      if (!state.detail[ticker]) state.detail[ticker] = await api(`/api/company/${ticker}`);
+      return state.detail[ticker];
     }
-    function renderSidebar() {
-      const list = $("tickerList");
-      list.innerHTML = "";
-      for (const c of state.summary.companies) {
-        const btn = document.createElement("button");
-        btn.className = "ticker-btn" + (c.ticker === state.selected ? " active" : "");
-        btn.innerHTML = `<div class="ticker-top"><span class="ticker-symbol">${c.ticker}</span><span class="price">${money(c.latest_price)}</span></div>
-          <div class="small">${c.name}</div>
-          <div class="small">${c.forecast_count} forecast records | ${c.latest_price_date || "no prices"}</div>`;
-        btn.onclick = () => loadCompany(c.ticker);
-        list.appendChild(btn);
+    function signalFor(ticker) {
+      const row = (state.board?.companies || []).find(c => c.ticker === ticker);
+      return row ? row.signal : null;
+    }
+
+    /* ---------- relative time + polling ---------- */
+    function relTime(ms) {
+      if (!ms) return "—";
+      const s = Math.round((Date.now() - ms) / 1000);
+      if (s < 60) return "just now";
+      const m = Math.round(s / 60);
+      if (m < 60) return m + "m ago";
+      const h = Math.round(m / 60);
+      return h + "h ago";
+    }
+    function renderStatus() {
+      $("statusDot").className = "dot" + (state.refreshing ? " spin" : "");
+      $("statusText").textContent = state.refreshing ? "refreshing data…" : `updated ${relTime(state.lastRefresh)} · auto`;
+    }
+    function isMarketHoursET() {
+      const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const day = et.getDay();
+      if (day === 0 || day === 6) return false;
+      const mins = et.getHours() * 60 + et.getMinutes();
+      return mins >= 570 && mins < 960; // 9:30–16:00 ET
+    }
+    async function doPoll() {
+      if (state.refreshing) return;
+      state.refreshing = true; renderStatus();
+      try {
+        await api("/api/refresh", { method: "POST" });
+        try { await api("/api/evaluate", { method: "POST" }); } catch (e) {}
+        state.detail = {}; state.accuracy = null;
+        await loadBoard();
+        state.lastRefresh = Date.now();
+        if (state.view === "company" && state.selected) { await loadDetail(state.selected); }
+        render();
+      } catch (e) {
+        // keep last good data; status will simply age
+      } finally {
+        state.refreshing = false; renderStatus();
       }
     }
-    function render() {
-      const d = state.detail;
-      const company = d.company;
-      const metrics = d.metrics || {};
-      const market = metrics.market || {};
-      const fundamentals = metrics.fundamentals || {};
-      const latest = d.forecasts[0];
-      $("title").textContent = `${company.ticker} - ${company.name || company.ticker}`;
-      $("subtitle").textContent = `Data refresh: ${metrics.refreshed_at || "not refreshed"} | Forecasts are stored as immutable JSON records.`;
-      renderMetrics(market, fundamentals, latest);
-      if (state.tab === "overview") renderOverview();
-      if (state.tab === "forecasts") renderForecasts();
-      if (state.tab === "history") renderHistory();
-      if (state.tab === "accuracy") renderAccuracy();
-      if (state.tab === "price") renderPrice();
+    function scheduleNextPoll() {
+      const delay = isMarketHoursET() ? 60 * 60 * 1000 : 6 * 60 * 60 * 1000;
+      setTimeout(async () => { await doPoll(); scheduleNextPoll(); }, delay);
     }
-    function renderMetrics(market, fundamentals, latest) {
-      const m = fundamentals.metrics || {};
-      $("metricGrid").innerHTML = [
-        metric("Latest Price", money(market.current_price), market.fetched_at || "refresh needed"),
-        metric("Revenue", compact(m.revenue?.value), m.revenue?.period_end || "SEC unavailable"),
-        metric("Net Margin", pct(m.net_margin?.value), m.net_margin ? "derived from SEC facts" : "unavailable"),
-        metric("Shares", compact(m.shares_outstanding?.value || m.weighted_diluted_shares?.value), m.shares_outstanding?.period_end || "unavailable"),
-        metric("Latest 1Y Base", latest?.horizons?.["1y"] ? money(latest.horizons["1y"].base) : "no forecast", latest?.created_at || "generate one")
-      ].join("");
+
+    /* ---------- board view ---------- */
+    function boardRows() {
+      const rows = (state.board?.companies || []).slice();
+      const q = state.query.trim().toLowerCase();
+      const activeFilter = filterFor(state.filter);
+      let filtered = rows.filter(r => {
+        if (q && !(r.ticker.toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q))) return false;
+        return activeFilter.test(r);
+      });
+      const expOf = (r) => r.signal?.expected_return_13w;
+      const withSig = filtered.filter(r => Number.isFinite(expOf(r)));
+      const noSig = filtered.filter(r => !Number.isFinite(expOf(r)));
+      const cmp = {
+        signal: (a, b) => expOf(b) - expOf(a),
+        price: (a, b) => (b.signal?.current_price || 0) - (a.signal?.current_price || 0),
+        name: (a, b) => a.ticker.localeCompare(b.ticker),
+        confidence: (a, b) => (b.signal?.horizon_13w?.confidence || 0) - (a.signal?.horizon_13w?.confidence || 0),
+      }[state.sort];
+      withSig.sort(cmp);
+      noSig.sort((a, b) => a.ticker.localeCompare(b.ticker));
+      return { withSig, noSig };
     }
-    function metric(label, value, note) {
-      return `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div><div class="small">${note || ""}</div></div>`;
+    function sparkSvg(spark, tone) {
+      if (!spark || spark.length < 2) return "";
+      const w = 60, h = 22, min = Math.min(...spark), max = Math.max(...spark), rng = max - min || 1;
+      const pts = spark.map((v, i) => `${(i / (spark.length - 1) * w).toFixed(1)},${(h - (v - min) / rng * h).toFixed(1)}`).join(" ");
+      const color = tone === "good" ? "#1c7a45" : tone === "bad" ? "#b03232" : "#69717a";
+      return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
     }
-    function renderOverview() {
-      const d = state.detail, metrics = d.metrics || {}, fundamentals = metrics.fundamentals || {}, market = metrics.market || {};
-      const warnings = [...(fundamentals.warnings || [])], analyst = market.analyst_targets || {};
-      $("content").innerHTML = `<div class="two-col">
-        <div class="stack">
-          <div class="card"><div class="label">Thesis</div><div>${d.company.thesis || "<span class='muted'>No thesis entered yet. Edit companies/" + d.company.ticker + ".json to preserve durable research notes.</span>"}</div></div>
-          <div class="card"><div class="label">Source Health</div><table class="table">
-            <tr><th>Source</th><th>Status</th><th>Timestamp</th></tr>
-            <tr><td>SEC fundamentals</td><td>${fundamentals.source_state || "missing"}</td><td>${fundamentals.fetched_at || "unavailable"}</td></tr>
-            <tr><td>Market data</td><td>${market.source_state || "missing"}</td><td>${market.fetched_at || "unavailable"}</td></tr>
-          </table></div>
-          <div class="card"><div class="label">Warnings</div>${warnings.length ? warnings.map(w => `<div class="small">${escapeHtml(w)}</div>`).join("") : "<span class='muted'>No warnings recorded.</span>"}</div>
-        </div>
-        <div class="stack">
-          <div class="card"><div class="label">Analyst Targets</div><div class="three-col">${metric("Low", money(analyst.target_low), "")}${metric("Mean", money(analyst.target_mean), "")}${metric("High", money(analyst.target_high), "")}</div></div>
-          <div class="card"><div class="label">Upcoming Event</div><div class="value">${market.next_earnings_date || "unavailable"}</div><div class="small">Event risk widens forecast intervals when earnings are near.</div></div>
-        </div>
-      </div>`;
+    function rangeBar(sig, tone) {
+      const h = sig.horizon_13w || {}, lo = h.lower, up = h.upper, now = sig.current_price;
+      const lo2 = Math.min(lo, now), up2 = Math.max(up, now), span = up2 - lo2 || 1;
+      const left = ((lo - lo2) / span) * 100, width = ((up - lo) / span) * 100, nowL = ((now - lo2) / span) * 100;
+      const col = tone === "good" ? "var(--good)" : tone === "bad" ? "var(--bad)" : "var(--muted)";
+      return `<div class="rangebar"><span style="left:${left}%;width:${width}%;background:${col};opacity:.5"></span><span class="now" style="left:${nowL}%"></span></div>
+        <div class="rb-lbl">${money0(lo)} – ${money0(up)}</div>`;
     }
-    function renderForecasts() {
-      const latest = state.detail.forecasts[0];
-      const rows = latest ? horizonRows(latest) : `<tr><td colspan="7" class="empty">No forecast has been recorded for ${state.selected}.</td></tr>`;
-      $("content").innerHTML = `<div class="stack">
-        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
-          <div><div class="label">Current Forecast</div><div class="small">${latest ? `${latest.forecast_id} | ${latest.created_at} | ${latest.model_version}` : "Generate an immutable record to begin tracking model accuracy."}</div></div>
-          <button class="primary" onclick="generateForecast()">Record Forecast</button>
-        </div>
-        <table class="table"><tr><th>Horizon</th><th>Target Date</th><th>Lower</th><th>Base</th><th>Upper</th><th>Confidence</th><th>Drivers</th></tr>${rows}</table>
-        ${latest ? `<div class="card"><div class="label">Warnings</div>${(latest.warnings || []).map(w => `<div class="small">${escapeHtml(w)}</div>`).join("") || "<span class='muted'>None</span>"}</div>` : ""}
-      </div>`;
+    function convPips(conf, tone) {
+      const on = conf >= 70 ? 3 : conf >= 45 ? 2 : 1;
+      return `<div class="conv">${[0, 1, 2].map(i => `<span class="pip ${i < on ? "on " + tone : ""}"></span>`).join("")}</div>`;
     }
-    function horizonRows(forecast) {
-      return Object.entries(forecast.horizons).map(([h, v]) => {
-        const d = v.drivers || {};
-        return `<tr><td><strong>${h}</strong></td><td>${v.target_date}</td><td>${money(v.lower)}</td><td>${money(v.base)}</td><td>${money(v.upper)}</td>
-          <td><span class="badge ${v.confidence_label}">${v.confidence_label} ${v.confidence}</span></td>
-          <td class="small">tech ${pct(d.technical_weight)} | fund ${pct(d.fundamental_weight)} | event +${pct(d.event_risk_widening)}</td></tr>`;
+    function renderBoard() {
+      const { withSig, noSig } = boardRows();
+      const head = `<div class="grid-row grid-head"><span>#</span><span>Company</span><span class="num">Price</span>
+        <span class="col-range">13-week range</span><span class="num">13w exp.</span><span class="col-conv" style="text-align:center">Conv.</span><span></span></div>`;
+      const rowHtml = (r, i) => {
+        const sig = r.signal, exp = sig?.expected_return_13w;
+        const v = verdictOf(exp), tone = v.tone, eCls = tone === "good" ? "good" : tone === "bad" ? "bad" : "flat";
+        return `<div class="grid-row ${tone === "good" ? "row-good" : tone === "bad" ? "row-bad" : ""}" data-ticker="${r.ticker}">
+          <span class="rank">${i}</span>
+          <span><div class="sym">${r.ticker}</div><div class="co-name">${esc(r.name || "")}</div></span>
+          <span class="num">${money0(sig.current_price)}</span>
+          <span class="col-range">${rangeBar(sig, tone)}</span>
+          <span class="num exp ${eCls}">${signed(exp)}</span>
+          <span class="col-conv">${convPips(sig.horizon_13w?.confidence || 0, tone)}</span>
+          <span style="display:flex;align-items:center;gap:8px;justify-content:flex-end">${sparkSvg(sig.spark, tone)}<span class="verdict-pill v-${tone}">${v.label}</span></span>
+        </div>`;
+      };
+      const noSigHtml = noSig.length ? `<div class="section-label">No signal yet — needs price history</div>` +
+        noSig.map(r => `<div class="grid-row" data-ticker="${r.ticker}"><span class="rank">·</span>
+          <span><div class="sym">${r.ticker}</div><div class="co-name">${esc(r.name || "")}</div></span>
+          <span class="num muted">—</span><span class="col-range muted">—</span><span class="num muted">—</span><span class="col-conv"></span>
+          <span style="text-align:right"><span class="verdict-pill v-flat">NO SIGNAL</span></span></div>`).join("") : "";
+      const body = withSig.map((r, i) => rowHtml(r, i + 1)).join("") || `<div class="empty">No companies match your filters.</div>`;
+
+      const allCompanies = state.board?.companies || [];
+      const filterOptions = FILTERS.map(f => {
+        const n = f.key === "all" ? allCompanies.length : allCompanies.filter(f.test).length;
+        return `<option value="${f.key}">Show ${f.label.toLowerCase()} (${n})</option>`;
       }).join("");
-    }
-    function renderHistory() {
-      const forecasts = state.detail.forecasts;
-      $("content").innerHTML = forecasts.length ? `<table class="table"><tr><th>Created</th><th>ID</th><th>Price</th><th>13w</th><th>1y</th><th>Warnings</th></tr>
-        ${forecasts.map(f => `<tr><td>${f.created_at}</td><td>${f.forecast_id}</td><td>${money(f.current_price)}</td><td>${rangeText(f.horizons["13w"])}</td><td>${rangeText(f.horizons["1y"])}</td><td>${(f.warnings || []).length}</td></tr>`).join("")}</table>` : `<div class="empty">No forecast records yet.</div>`;
-    }
-    function rangeText(h) { return h ? `${money(h.lower)} / ${money(h.base)} / ${money(h.upper)}` : "unavailable"; }
-    async function renderAccuracy() {
-      if (!state.accuracy) state.accuracy = await api("/api/accuracy");
-      const summary = state.accuracy.summary.filter(r => r.ticker === state.selected);
-      const outcomes = state.accuracy.outcomes.filter(r => r.ticker === state.selected);
-      $("content").innerHTML = `<div class="stack">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
-          <div><div class="label">Calibration</div><div class="small">A 90% interval should contain actual prices roughly 90% of the time after enough mature forecasts.</div></div>
-          <button class="secondary" onclick="evaluateForecasts()">Evaluate Mature Forecasts</button>
+      $("root").innerHTML = `
+        <div class="toolbar">
+          <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
+            <input id="search" placeholder="Search ${allCompanies.length} companies…" value="${esc(state.query)}"></div>
+          <select class="sort" id="filter" aria-label="Filter companies">${filterOptions}</select>
+          <select class="sort" id="sort" aria-label="Sort companies">
+            <option value="signal">Sort: 13-week return</option>
+            <option value="confidence">Sort: conviction</option>
+            <option value="price">Sort: price</option>
+            <option value="name">Sort: ticker</option>
+          </select>
         </div>
-        <table class="table"><tr><th>Horizon</th><th>Model</th><th>Count</th><th>Interval Accuracy</th><th>Mean Abs Base Error</th></tr>
-          ${summary.length ? summary.map(r => `<tr><td>${r.horizon}</td><td>${r.model_version}</td><td>${r.n}</td><td>${pct(r.interval_accuracy)}</td><td>${pct(r.mean_abs_base_error)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">No mature evaluated forecasts yet.</td></tr>`}</table>
-        <table class="table"><tr><th>Forecast</th><th>Horizon</th><th>Target</th><th>Actual</th><th>Inside</th><th>Drawdown</th><th>Upside</th></tr>
-          ${outcomes.length ? outcomes.map(o => `<tr><td>${o.forecast_id}</td><td>${o.horizon}</td><td>${o.target_date}</td><td>${money(o.actual_price)}</td><td>${o.inside_interval ? "yes" : "no"}</td><td>${pct(o.max_drawdown_pct)}</td><td>${pct(o.max_upside_pct)}</td></tr>`).join("") : `<tr><td colspan="7" class="empty">No outcome records.</td></tr>`}</table>
-      </div>`;
+        <div class="board"><div class="grid-head-wrap">${head}</div><div class="board-body">${body}${noSigHtml}</div></div>
+        <p class="muted" style="font-size:12px;margin:10px 4px 0">Ranked by 13-week expected return — strongest buys on top, strongest sells at the bottom. Click any row to research the company.</p>`;
+      $("sort").value = state.sort;
+      $("filter").value = state.filter;
+      $("search").addEventListener("input", (e) => { state.query = e.target.value; const c = e.target.selectionStart; renderBoard(); const s = $("search"); s.focus(); s.setSelectionRange(c, c); });
+      $("sort").addEventListener("change", (e) => { state.sort = e.target.value; renderBoard(); });
+      $("filter").addEventListener("change", (e) => { state.filter = e.target.value; renderBoard(); });
+      document.querySelectorAll(".board-body .grid-row").forEach(row => row.addEventListener("click", () => openCompany(row.dataset.ticker)));
     }
+
+    /* ---------- company view ---------- */
+    async function openCompany(ticker) {
+      state.selected = ticker; state.view = "company"; state.tab = "snapshot";
+      await loadDetail(ticker);
+      render();
+    }
+    function backToBoard() { state.view = "board"; render(); }
+
+    function renderCompany() {
+      const d = state.detail[state.selected];
+      const sig = signalFor(state.selected);
+      const company = d.company || {};
+      const exp = sig?.expected_return_13w;
+      const v = verdictOf(exp), tone = v.tone;
+      const h = sig?.horizon_13w || {};
+      const price = sig?.current_price ?? (d.prices?.length ? d.prices[d.prices.length - 1].close : null);
+      const confLabel = h.confidence_label || "—";
+      const line = sig
+        ? `13-week view: ${money0(h.lower)}–${money0(h.upper)}, most likely ~${money0(h.base)} (${signed(exp)}) · ${confLabel} conviction`
+        : "No live forecast available yet for this company.";
+
+      const rail = (state.board?.companies || []).map(r => {
+        const e = r.signal?.expected_return_13w, t = verdictOf(e).tone;
+        const col = t === "good" ? "var(--good)" : t === "bad" ? "var(--bad)" : "var(--line-2)";
+        return `<div class="rail-row ${r.ticker === state.selected ? "active" : ""}" data-ticker="${r.ticker}">
+          <span class="rail-dot" style="background:${col}"></span><span class="rail-sym">${r.ticker}</span>
+          <span class="rail-exp ${t === "good" ? "exp good" : t === "bad" ? "exp bad" : "muted"}">${Number.isFinite(e) ? signed(e) : "—"}</span></div>`;
+      }).join("");
+
+      const tabs = ["snapshot", "forecast", "price", "history", "accuracy"];
+      const tabLabels = { snapshot: "Snapshot", forecast: "Forecast", price: "Price action", history: "History", accuracy: "Accuracy" };
+      $("root").innerHTML = `<div class="company">
+        <div class="rail">
+          <div class="back" id="backBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Board</div>
+          ${rail}
+        </div>
+        <main>
+          <div class="co-head"><h1>${state.selected}</h1><span class="muted" style="font-size:15px">${esc(company.name || "")}</span><span class="price">${money(price)}</span></div>
+          <div class="banner ${tone}"><span class="lab">${v.label}</span><span class="line">${line}</span></div>
+          <div class="tabs">${tabs.map(t => `<span class="tab ${state.tab === t ? "active" : ""}" data-tab="${t}">${tabLabels[t]}</span>`).join("")}</div>
+          <div id="tabContent"></div>
+        </main></div>`;
+      $("backBtn").addEventListener("click", backToBoard);
+      document.querySelectorAll(".rail-row").forEach(r => r.addEventListener("click", () => openCompany(r.dataset.ticker)));
+      document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { state.tab = t.dataset.tab; renderTab(); }));
+      renderTab();
+    }
+
+    function renderTab() {
+      ({ snapshot: renderSnapshot, forecast: renderForecastTab, price: renderPrice, history: renderHistory, accuracy: renderAccuracy }[state.tab])();
+    }
+
+    function whyText(sig) {
+      if (!sig?.features) return "Not enough data to explain this signal yet.";
+      const t = sig.features.technical || {}, f = sig.features.fundamental || {}, parts = [];
+      const r1 = t.return_252d;
+      if (Number.isFinite(r1)) parts.push(`${r1 >= 0 ? "Up" : "Down"} ${Math.abs(r1 * 100).toFixed(0)}% over the past year`);
+      const ma = t.ma_200_position;
+      if (Number.isFinite(ma)) parts.push(`trading ${ma >= 0 ? "above" : "below"} its 200-day average`);
+      if (Number.isFinite(f.net_margin)) parts.push(`net margin ${(f.net_margin * 100).toFixed(0)}%`);
+      if (Number.isFinite(f.price_to_sales)) parts.push(`P/S ${f.price_to_sales.toFixed(1)}`);
+      const ev = sig.features.event_risk?.next_earnings_date;
+      let s = parts.length ? parts.join(", ") + "." : "Signal blends momentum, valuation, and balance-sheet strength.";
+      if (ev) s += ` Next earnings ${ev} may widen the range.`;
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    function renderSnapshot() {
+      const d = state.detail[state.selected], sig = signalFor(state.selected);
+      const f = sig?.features?.fundamental || {}, ev = sig?.features?.event_risk || {};
+      const cards = [
+        ["Net margin", pct(f.net_margin)],
+        ["P/S", Number.isFinite(f.price_to_sales) ? f.price_to_sales.toFixed(1) : "—"],
+        ["P/E", Number.isFinite(f.price_to_earnings) ? f.price_to_earnings.toFixed(1) : "—"],
+        ["Next earnings", ev.next_earnings_date || "—"],
+      ];
+      $("tabContent").innerHTML = `<div class="stack">
+        <div class="card"><div class="label">Price → 13-week forecast</div><canvas class="cone" id="cone" width="900" height="240"></canvas>
+          <div class="muted" style="font-size:12px;margin-top:8px">Shaded band is the 13-week scenario range; dashed line is the base case. Ranges are decision-support scenarios, not predictions.</div></div>
+        <div class="metric-grid">${cards.map(([l, v]) => `<div class="metric"><div class="m-lab">${l}</div><div class="m-val">${v}</div></div>`).join("")}</div>
+        <div class="card"><div class="label">Why this signal</div><div class="why">${esc(whyText(sig))}</div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div><div class="label">Thesis</div><div class="why">${d.company.thesis ? esc(d.company.thesis) : `<span class="muted">No thesis yet. Edit companies/${state.selected}.json to preserve durable research notes.</span>`}</div></div>
+          <button class="btn ghost" id="recBtn">Record forecast</button></div></div>
+      </div>`;
+      $("recBtn").addEventListener("click", recordForecast);
+      drawCone();
+    }
+
+    function drawCone() {
+      const canvas = $("cone"); if (!canvas) return;
+      const ctx = canvas.getContext("2d"), W = canvas.width, H = canvas.height, pad = 30;
+      ctx.clearRect(0, 0, W, H); ctx.fillStyle = "#fbfcfa"; ctx.fillRect(0, 0, W, H);
+      const d = state.detail[state.selected], sig = signalFor(state.selected);
+      const closes = (d.prices || []).map(p => Number(p.close)).filter(Number.isFinite).slice(-90);
+      if (closes.length < 2 || !sig) return;
+      const h = sig.horizon_13w, now = sig.current_price, lo = h.lower, up = h.upper, base = h.base;
+      const vals = closes.concat([lo, up, now]);
+      const min = Math.min(...vals), max = Math.max(...vals), rng = (max - min) || 1;
+      const splitX = pad + (W - pad * 2) * 0.64, rightX = W - pad;
+      const yOf = (v) => H - pad - ((v - min) / rng) * (H - pad * 2);
+      ctx.strokeStyle = "#e6e9e4"; ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) { const y = pad + i * ((H - pad * 2) / 3); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(rightX, y); ctx.stroke(); }
+      // forecast cone
+      const yNow = yOf(now);
+      ctx.fillStyle = "rgba(47,75,214,.12)"; ctx.beginPath();
+      ctx.moveTo(splitX, yNow); ctx.lineTo(rightX, yOf(up)); ctx.lineTo(rightX, yOf(lo)); ctx.closePath(); ctx.fill();
+      // base dashed
+      ctx.strokeStyle = "#6b7280"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+      ctx.moveTo(splitX, yNow); ctx.lineTo(rightX, yOf(base)); ctx.stroke(); ctx.setLineDash([]);
+      // history line
+      ctx.strokeStyle = "#146c5f"; ctx.lineWidth = 2; ctx.beginPath();
+      closes.forEach((v, i) => { const x = pad + i / (closes.length - 1) * (splitX - pad), y = yOf(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+      ctx.stroke();
+      // today divider + marker
+      ctx.strokeStyle = "#cfd4ce"; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(splitX, pad); ctx.lineTo(splitX, H - pad); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#146c5f"; ctx.beginPath(); ctx.arc(splitX, yNow, 3.5, 0, 7); ctx.fill();
+      // labels
+      ctx.fillStyle = "#69717a"; ctx.font = "12px system-ui";
+      ctx.fillText(money0(up), rightX - 52, yOf(up) - 4);
+      ctx.fillText(money0(lo), rightX - 52, yOf(lo) + 14);
+      ctx.fillText("today", splitX + 4, pad + 10);
+    }
+
+    function renderForecastTab() {
+      const sig = signalFor(state.selected);
+      const horizons = sig?.horizons || {};
+      const order = ["13w", "1y", "3y", "5y", "10y"], labels = { "13w": "13 wk", "1y": "1 yr", "3y": "3 yr", "5y": "5 yr", "10y": "10 yr" };
+      const now = sig?.current_price;
+      const rows = order.filter(k => horizons[k]).map(k => {
+        const hz = horizons[k], lo = hz.lower, up = hz.upper, base = hz.base;
+        const lo2 = Math.min(lo, now), up2 = Math.max(up, now), span = (up2 - lo2) || 1;
+        const left = (lo - lo2) / span * 100, width = (up - lo) / span * 100, baseL = (base - lo2) / span * 100, nowL = (now - lo2) / span * 100;
+        const exp = base / now - 1, eCls = exp >= 0.03 ? "good" : exp <= -0.03 ? "bad" : "flat";
+        return `<div class="hbar-row">
+          <div class="hbar-h">${labels[k]}<small>${hz.confidence_label || ""}</small></div>
+          <div class="hbar"><div class="track"></div><div class="fill" style="left:${left}%;width:${width}%"></div>
+            <div class="base" style="left:${baseL}%"></div><div class="now" style="left:${nowL}%"></div></div>
+          <div class="hbar-end exp ${eCls}">${signed(exp)}<div class="muted" style="font-weight:500;font-size:11px">${money0(lo)}–${money0(up)}</div></div>
+        </div>`;
+      }).join("");
+      $("tabContent").innerHTML = `<div class="card"><div class="label">Forecast by horizon</div>
+        ${rows || `<div class="empty">No live forecast available.</div>`}
+        <div class="muted" style="font-size:12px;margin-top:10px">Bar = scenario range, green tick = base case, dark tick = today's price. Expected % is base vs. current.</div></div>`;
+    }
+
     function renderPrice() {
-      const hist = state.detail.histogram || { bins: [] };
+      const d = state.detail[state.selected], hist = d.histogram || { bins: [] };
       const max = Math.max(1, ...hist.bins.map(b => b.count));
-      $("content").innerHTML = `<div class="two-col">
-        <div class="stack"><div><div class="label">Price History</div><canvas class="chart" id="priceChart" width="900" height="260"></canvas></div><div class="small">Latest ${state.detail.prices.length} cached trading days. Refresh data to extend the local cache.</div></div>
-        <div><div class="label">Rolling 13-Week Return Histogram</div><div class="hist">${hist.bins.map(b => `<div class="bar" style="height:${Math.max(4, b.count / max * 100)}%" data-tip="${pct(b.low)} to ${pct(b.high)}: ${b.count}"></div>`).join("") || "<div class='empty'>No histogram yet.</div>"}</div><div class="small">${hist.count || 0} rolling windows over the past ${hist.years || 2} years.</div></div>
+      $("tabContent").innerHTML = `<div class="two-col">
+        <div class="card"><div class="label">Price history</div><canvas class="chart" id="priceChart" width="900" height="260"></canvas>
+          <div class="muted" style="font-size:12px;margin-top:8px">Latest ${d.prices.length} cached trading days.</div></div>
+        <div class="card"><div class="label">Rolling 13-week return histogram</div>
+          <div class="hist">${hist.bins.map(b => `<div class="bar" style="height:${Math.max(4, b.count / max * 100)}%" data-tip="${pct(b.low)} to ${pct(b.high)}: ${b.count}"></div>`).join("") || "<div class='empty'>No histogram yet.</div>"}</div>
+          <div class="muted" style="font-size:12px;margin-top:8px">${hist.count || 0} windows over ${hist.years || 2} years.</div></div>
       </div>`;
       drawPriceChart();
     }
     function drawPriceChart() {
-      const canvas = $("priceChart");
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d"), prices = state.detail.prices || [];
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#fbfcfa"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const canvas = $("priceChart"); if (!canvas) return;
+      const ctx = canvas.getContext("2d"), prices = state.detail[state.selected].prices || [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#fbfcfa"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       const closes = prices.map(p => Number(p.close)).filter(Number.isFinite);
       if (closes.length < 2) return;
-      const min = Math.min(...closes), max = Math.max(...closes), pad = 24;
-      ctx.strokeStyle = "#dfe3df"; ctx.lineWidth = 1;
+      const min = Math.min(...closes), max = Math.max(...closes), pad = 26;
+      ctx.strokeStyle = "#e6e9e4"; ctx.lineWidth = 1;
       for (let i = 0; i < 4; i++) { const y = pad + i * ((canvas.height - pad * 2) / 3); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(canvas.width - pad, y); ctx.stroke(); }
       ctx.strokeStyle = "#146c5f"; ctx.lineWidth = 2; ctx.beginPath();
-      closes.forEach((v, i) => {
-        const x = pad + i / (closes.length - 1) * (canvas.width - pad * 2);
-        const y = canvas.height - pad - ((v - min) / Math.max(.0001, max - min)) * (canvas.height - pad * 2);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
+      closes.forEach((v, i) => { const x = pad + i / (closes.length - 1) * (canvas.width - pad * 2), y = canvas.height - pad - ((v - min) / Math.max(.0001, max - min)) * (canvas.height - pad * 2); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
       ctx.stroke();
-      ctx.fillStyle = "#68707a"; ctx.font = "12px system-ui"; ctx.fillText(money(max), pad, 16); ctx.fillText(money(min), pad, canvas.height - 8);
+      ctx.fillStyle = "#69717a"; ctx.font = "12px system-ui"; ctx.fillText(money0(max), pad, 16); ctx.fillText(money0(min), pad, canvas.height - 8);
     }
-    async function generateForecast() {
-      showLog(`Recording forecast for ${state.selected}...`);
-      const result = await api(`/api/forecast/${state.selected}`, { method: "POST" });
-      showLog(`Recorded immutable forecast ${result.forecast_id} for ${state.selected}.`);
-      await loadSummary();
+
+    function renderHistory() {
+      const forecasts = state.detail[state.selected].forecasts || [];
+      const rangeText = (h) => h ? `${money0(h.lower)} / ${money0(h.base)} / ${money0(h.upper)}` : "—";
+      $("tabContent").innerHTML = `<div class="card"><div class="label">Recorded immutable forecasts</div>${forecasts.length ?
+        `<table class="table"><tr><th>Created</th><th>ID</th><th>Price</th><th>13w (lo/base/up)</th><th>1y (lo/base/up)</th><th>Warn</th></tr>
+        ${forecasts.map(f => `<tr><td>${(f.created_at || "").slice(0, 16).replace("T", " ")}</td><td>${f.forecast_id}</td><td>${money0(f.current_price)}</td>
+          <td>${rangeText(f.horizons?.["13w"])}</td><td>${rangeText(f.horizons?.["1y"])}</td><td>${(f.warnings || []).length}</td></tr>`).join("")}</table>`
+        : `<div class="empty">No forecast records yet. Use “Record forecast” on the Snapshot to start tracking accuracy.</div>`}</div>`;
     }
-    async function evaluateForecasts() {
-      showLog("Evaluating mature forecasts...");
-      const result = await api("/api/evaluate", { method: "POST" });
-      state.accuracy = await api("/api/accuracy");
-      showLog(`Evaluated ${result.evaluated.length} horizon outcomes. Skipped ${result.skipped.length} not-yet-mature or missing cases.`);
-      render();
+
+    async function renderAccuracy() {
+      if (!state.accuracy) { try { state.accuracy = await api("/api/accuracy"); } catch (e) { state.accuracy = { summary: [], outcomes: [] }; } }
+      const summary = state.accuracy.summary.filter(r => r.ticker === state.selected);
+      const outcomes = state.accuracy.outcomes.filter(r => r.ticker === state.selected);
+      $("tabContent").innerHTML = `<div class="stack">
+        <div class="card"><div class="label">Calibration</div>
+          <div class="muted" style="font-size:13px;margin-bottom:8px">A 90% range should contain the actual price ~90% of the time once enough forecasts mature. Evaluation runs automatically in the background.</div>
+          <table class="table"><tr><th>Horizon</th><th>Model</th><th>N</th><th>Inside range</th><th>Mean abs. base error</th></tr>
+          ${summary.length ? summary.map(r => `<tr><td>${r.horizon}</td><td>${r.model_version}</td><td>${r.n}</td><td>${pct(r.interval_accuracy)}</td><td>${pct(r.mean_abs_base_error)}</td></tr>`).join("")
+            : `<tr><td colspan="5" class="empty">No matured forecasts yet — check back after the horizon dates pass.</td></tr>`}</table></div>
+        ${outcomes.length ? `<div class="card"><div class="label">Outcomes</div><table class="table"><tr><th>Forecast</th><th>Horizon</th><th>Target</th><th>Actual</th><th>Inside</th><th>Drawdown</th><th>Upside</th></tr>
+          ${outcomes.map(o => `<tr><td>${o.forecast_id}</td><td>${o.horizon}</td><td>${o.target_date}</td><td>${money0(o.actual_price)}</td><td>${o.inside_interval ? "yes" : "no"}</td><td>${pct(o.max_drawdown_pct)}</td><td>${pct(o.max_upside_pct)}</td></tr>`).join("")}</table></div>` : ""}
+      </div>`;
     }
-    async function refreshData() {
-      showLog("Refreshing seed tickers. This can take a moment because SEC and market endpoints are live.");
-      const result = await api("/api/refresh", { method: "POST" });
-      showLog(`Refreshed ${result.refreshed.length} tickers.`);
-      await loadSummary();
+
+    async function recordForecast() {
+      const btn = $("recBtn"); if (btn) { btn.disabled = true; btn.textContent = "Recording…"; }
+      try {
+        await api(`/api/forecast/${state.selected}`, { method: "POST" });
+        delete state.detail[state.selected]; state.accuracy = null;
+        await loadDetail(state.selected);
+        state.tab = "history"; render();
+      } catch (e) { if (btn) { btn.disabled = false; btn.textContent = "Record forecast"; } alert("Could not record forecast: " + e.message); }
     }
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch]));
+
+    /* ---------- root render ---------- */
+    function render() {
+      if (state.view === "company" && state.selected) renderCompany();
+      else renderBoard();
+      renderStatus();
     }
-    $("refreshBtn").onclick = refreshData;
-    $("evaluateBtn").onclick = evaluateForecasts;
-    $("tabs").onclick = (event) => {
-      const tab = event.target.closest(".tab");
-      if (!tab) return;
-      state.tab = tab.dataset.tab;
-      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
-      render();
-    };
-    loadSummary().catch(err => {
-      showLog(err.stack || String(err));
-      $("title").textContent = "Unable to load app";
-    });
+
+    (async function init() {
+      try {
+        await loadBoard();
+        state.lastRefresh = Date.now();
+        render();
+        setInterval(renderStatus, 30 * 1000);
+        scheduleNextPoll();
+      } catch (err) {
+        $("root").innerHTML = `<div class="empty">Unable to load the app.<br><span class="muted">${esc(err.message || String(err))}</span></div>`;
+      }
+    })();
   </script>
 </body>
 </html>

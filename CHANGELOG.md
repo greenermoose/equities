@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-16 — UI/UX redesign
+
+- Reworked the browser UI into a portfolio-wide **Signal Board** landing view that ranks every company by 13-week expected return, from strongest buy to strongest sell.
+- Added a company **Snapshot** drill-in: a plain-language buy/sell verdict, a price-to-13-week forecast "cone", valuation/quality metric cards, and an auto-generated rationale.
+- Added a `GET /api/board` endpoint that computes a live, non-persisted 13-week signal for each company (immutable forecast ledger files are still written only on explicit "Record forecast").
+- Added search, a sort control (13-week return, conviction, price, ticker), and a data-driven filter dropdown (All / Buys / Sells) that replaces the old filter buttons and supports new categories without UI changes.
+- Replaced the manual "Refresh Data" and "Evaluate Forecasts" buttons with automatic client-side polling (hourly during US market hours, less often otherwise) plus background evaluation, surfaced as an "updated … ago" freshness indicator.
+- Made price-to-sales the primary valuation metric in the Snapshot, matching the forecast model's fundamental inputs.
+- Added `.claude/launch.json` so the app can be launched for local preview.
+
 ## 2026-06-16
 
 - Added the first local equities decision-support app.

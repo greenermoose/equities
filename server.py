@@ -927,6 +927,8 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             if parsed.path == "/":
                 self.serve_file(HTTP_DIR / "index.html", "text/html")
+            elif parsed.path.startswith("/api/board"):
+                self.json_response(board())
             elif parsed.path.startswith("/api/summary"):
                 self.json_response(app_summary())
             elif parsed.path.startswith("/api/company/"):
@@ -1032,6 +1034,84 @@ def company_detail(ticker: str) -> dict[str, Any]:
         "forecasts": load_forecasts(ticker),
         "histogram": histogram(ticker),
     }
+
+
+_BOARD_CACHE: dict[str, Any] = {"key": None, "fetched_at": None, "payload": None}
+_BOARD_TTL_SECONDS = 60
+
+
+def _board_cache_key() -> str:
+    parts = []
+    for company in load_companies():
+        ticker = company["ticker"].upper()
+        metrics = latest_metrics(ticker)
+        parts.append(f"{ticker}:{metrics.get('refreshed_at') if metrics else 'none'}")
+    return "|".join(parts)
+
+
+def company_signal(ticker: str) -> dict[str, Any] | None:
+    """Compute a current 13-week signal without persisting a forecast file."""
+    forecast = generate_forecast(ticker, persist=False)
+    horizon = forecast.get("horizons", {}).get("13w")
+    current = safe_float(forecast.get("current_price"))
+    if not horizon or not current:
+        return None
+    base = safe_float(horizon.get("base"))
+    expected = (base / current - 1) if base is not None else None
+    prices = get_prices(ticker)
+    spark = [safe_float(row.get("close")) for row in prices[-30:]]
+    spark = [x for x in spark if x is not None]
+    return {
+        "current_price": current,
+        "expected_return_13w": expected,
+        "horizon_13w": {
+            "lower": horizon.get("lower"),
+            "base": horizon.get("base"),
+            "upper": horizon.get("upper"),
+            "confidence": horizon.get("confidence"),
+            "confidence_label": horizon.get("confidence_label"),
+            "target_date": horizon.get("target_date"),
+        },
+        "horizons": forecast.get("horizons", {}),
+        "features": forecast.get("features", {}),
+        "warnings": forecast.get("warnings", []),
+        "spark": spark,
+    }
+
+
+def board() -> dict[str, Any]:
+    key = _board_cache_key()
+    cached = _BOARD_CACHE
+    if (
+        cached["payload"] is not None
+        and cached["key"] == key
+        and cached["fetched_at"] is not None
+        and (utc_now() - cached["fetched_at"]).total_seconds() < _BOARD_TTL_SECONDS
+    ):
+        return cached["payload"]
+
+    rows = []
+    for company in load_companies():
+        ticker = company["ticker"].upper()
+        row: dict[str, Any] = {
+            "ticker": ticker,
+            "name": company.get("name", ticker),
+            "watch_status": company.get("watch_status", "watch"),
+            "signal": None,
+        }
+        try:
+            row["signal"] = company_signal(ticker)
+        except Exception as exc:
+            row["error"] = f"{type(exc).__name__}: {exc}"
+        rows.append(row)
+
+    payload = {
+        "current_date": today_iso(),
+        "model_version": MODEL_VERSION,
+        "companies": rows,
+    }
+    _BOARD_CACHE.update({"key": key, "fetched_at": utc_now(), "payload": payload})
+    return payload
 
 
 def guess_content_type(path: str) -> str:
