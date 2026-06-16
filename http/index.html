@@ -141,8 +141,13 @@
     .table-wrap { width: 100%; overflow-x: auto; }
     .facts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
     .fact { border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; background: #fafbf9; min-width: 0; }
+    .fact.flag-error { border-color: #e2a4a8; background: var(--bad-bg); }
+    .fact.flag-warning { border-color: #e5c391; background: #fff7e8; }
     .fact .k { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
     .fact .v { font-size: 16px; font-weight: 730; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .flag-note { font-size: 11px; line-height: 1.35; margin-top: 5px; color: var(--muted); }
+    .flag-error .flag-note { color: var(--bad); }
+    .flag-warning .flag-note { color: #8a5a14; }
     .warning-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
     .hide { display: none !important; }
     @media (max-width: 900px) {
@@ -531,8 +536,17 @@
       if (!source) return "";
       return `<div class="muted" style="font-size:11px;margin-top:2px">${esc(source)}</div>`;
     }
-    function factCard(label, value, source = "") {
-      return `<div class="fact"><div class="k">${esc(label)}</div><div class="v">${value}</div>${sourceNote(source)}</div>`;
+    function firstFlag(flags, metric) {
+      return (flags || []).find(f => f.metric === metric) || null;
+    }
+    function flagTone(flag) {
+      return flag?.severity === "error" ? "flag-error" : flag ? "flag-warning" : "";
+    }
+    function flagNote(flag) {
+      return flag ? `<div class="flag-note">${esc(flag.message || flag.code || "Sanity check flagged this value.")}</div>` : "";
+    }
+    function factCard(label, value, source = "", flag = null) {
+      return `<div class="fact ${flagTone(flag)}"><div class="k">${esc(label)}</div><div class="v">${value}</div>${sourceNote(source)}${flagNote(flag)}</div>`;
     }
 
     function renderValuation() {
@@ -541,9 +555,14 @@
         $("tabContent").innerHTML = `<div class="card"><div class="empty">${fc?.error ? esc(fc.error) : "No live forecast available."}</div></div>`;
         return;
       }
+      const d = state.detail[state.selected] || {};
       const f = fc.features?.fundamental || {};
       const t = fc.features?.technical || {};
       const ev = fc.features?.event_risk || {};
+      const sanityFlags = f.sanity?.flags || [];
+      const priceFlag = firstFlag(sanityFlags, "current_price");
+      const sharesFlag = firstFlag(sanityFlags, "shares_outstanding");
+      const marketCapFlag = firstFlag(sanityFlags, "market_cap");
       const horizons = fc.horizons || {};
       const traces = fc.calculation_trace?.horizons || {};
       const formulas = fc.valuation_model?.formulas || {};
@@ -580,6 +599,11 @@
         const c = traces[k] || horizons[k].calculation || {};
         return `<tr><td>${labels[k]}</td><td>${pctMaybe(c.volatility_used)}</td><td>${pctMaybe(c.vol_band)}</td><td>${pctMaybe(c.empirical_low)} / ${pctMaybe(c.empirical_high)}</td><td>${pctMaybe(c.event_risk_widening)}</td><td>${horizons[k].confidence || "unavailable"} ${esc(horizons[k].confidence_label || "")}</td></tr>`;
       }).join("");
+      const sanityRows = (d.sanity_observations || []).slice(0, 6).map(o => {
+        const flags = o.flags || [];
+        const flagText = flags.length ? flags.map(x => x.code || x.message).join(", ") : "none";
+        return `<tr><td>${esc((o.observed_at || "").slice(0, 16).replace("T", " "))}</td><td>${esc(o.status || "")}</td><td>${moneyCompact(o.computed_market_cap)}</td><td>${moneyCompact(o.usable_market_cap)}</td><td>${esc(flagText)}</td></tr>`;
+      }).join("");
       const warnings = (fc.warnings || []).map(w => `<li>${esc(w)}</li>`).join("");
 
       $("tabContent").innerHTML = `<div class="stack">
@@ -590,9 +614,9 @@
         </table></div></div>
         <div class="card"><div class="label">Fundamental indicators</div>
           <div class="facts-grid">
-            ${factCard("Shares outstanding", fmtPlain(f.shares_outstanding, 0))}
-            ${factCard("Current share price", money(fc.current_price))}
-            ${factCard("Market cap", moneyCompact(f.market_cap))}
+            ${factCard("Shares outstanding", fmtPlain(f.shares_outstanding, 0), "", sharesFlag)}
+            ${factCard("Current share price", money(fc.current_price), "", priceFlag)}
+            ${factCard("Market cap", moneyCompact(f.market_cap), f.computed_market_cap ? "computed " + moneyCompact(f.computed_market_cap) : "", marketCapFlag)}
             ${factCard("Latest revenue", moneyCompact(f.latest_revenue))}
             ${factCard("Revenue forecast CAGR", pctMaybe(f.revenue_forecast_cagr), f.revenue_forecast_cagr_source)}
             ${factCard("Share issuance/buyback CAGR", pctMaybe(f.share_change_cagr), f.share_change_cagr_source)}
@@ -603,6 +627,7 @@
             ${factCard("P/E", Number.isFinite(Number(f.price_to_earnings)) ? fmtPlain(f.price_to_earnings, 2) : "unavailable")}
             ${factCard("Next earnings", ev.next_earnings_date ? esc(ev.next_earnings_date) : "unavailable")}
           </div></div>
+        <div class="card"><div class="label">Recent sanity observations</div><div class="table-wrap"><table class="table"><tr><th>Observed</th><th>Status</th><th>Computed cap</th><th>Usable cap</th><th>Flags</th></tr>${sanityRows || `<tr><td colspan="5" class="empty">No sanity observations recorded yet.</td></tr>`}</table></div></div>
         <div class="two-col">
           <div class="card"><div class="label">Revenue history</div><div class="table-wrap"><table class="table"><tr><th>Period end</th><th>Revenue</th><th>Source</th></tr>${revenueRows || `<tr><td colspan="3" class="empty">Revenue history unavailable.</td></tr>`}</table></div></div>
           <div class="card"><div class="label">Share count history</div><div class="table-wrap"><table class="table"><tr><th>Period end</th><th>Shares</th><th>Source</th></tr>${shareRows || `<tr><td colspan="3" class="empty">Share history unavailable.</td></tr>`}</table></div></div>

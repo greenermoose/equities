@@ -100,6 +100,89 @@ class ForecastMathTests(unittest.TestCase):
         self.assertEqual(features["share_change_cagr"], -0.01)
         self.assertEqual(features["share_change_cagr_source"], "manual_assumptions")
 
+    def test_market_cap_is_calculated_from_price_and_shares(self):
+        fundamentals = {
+            "metrics": {
+                "revenue": {"value": 1_000_000},
+                "net_income": {"value": 100_000},
+                "shares_outstanding": {"value": 1_000_000},
+            }
+        }
+        features = server.valuation_features(10, fundamentals, {"market_cap": 5000}, {})
+        self.assertEqual(features["computed_market_cap"], 10_000_000)
+        self.assertEqual(features["provider_market_cap"], 5000)
+        self.assertEqual(features["market_cap"], 10_000_000)
+        self.assertEqual(features["price_to_sales"], 10)
+        self.assertIn(
+            "provider_market_cap_mismatch",
+            [flag["code"] for flag in features["sanity"]["flags"]],
+        )
+
+    def test_tsm_like_market_cap_fails_sanity_and_suppresses_ratios(self):
+        fundamentals = {
+            "metrics": {
+                "revenue": {"value": 100_000_000_000},
+                "net_income": {"value": 40_000_000_000},
+                "shares_outstanding": {"value": 25_932_524_521},
+            }
+        }
+        features = server.valuation_features(427.9649963378906, fundamentals, {}, {})
+        self.assertGreater(features["computed_market_cap"], server.MAX_EXPECTED_MARKET_CAP_USD)
+        self.assertIsNone(features["market_cap"])
+        self.assertIsNone(features["price_to_sales"])
+        self.assertIsNone(features["price_to_earnings"])
+        self.assertEqual(features["sanity"]["status"], "fail")
+        self.assertIn(
+            "market_cap_above_world_max",
+            [flag["code"] for flag in features["sanity"]["flags"]],
+        )
+
+    def test_invalid_price_and_shares_create_specific_sanity_flags(self):
+        sanity = server.valuation_sanity(-1, 10, -10, None)
+        codes = [flag["code"] for flag in sanity["flags"]]
+        self.assertEqual(sanity["status"], "fail")
+        self.assertIn("current_price_out_of_range", codes)
+        self.assertIn("shares_outstanding_out_of_range", codes)
+
+    def test_provider_market_cap_mismatch_does_not_replace_computed_market_cap(self):
+        fundamentals = {
+            "metrics": {
+                "revenue": {"value": 1_000_000},
+                "net_income": {"value": 100_000},
+                "shares_outstanding": {"value": 1_000_000},
+            }
+        }
+        features = server.valuation_features(10, fundamentals, {"market_cap": 15_000_000}, {})
+        self.assertEqual(features["market_cap"], 10_000_000)
+        self.assertEqual(features["sanity"]["status"], "warn")
+        self.assertIn(
+            "provider_market_cap_mismatch",
+            [flag["code"] for flag in features["sanity"]["flags"]],
+        )
+
+    def test_sanity_observations_are_deduped_by_refresh_and_policy(self):
+        original_db_path = server.DB_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                server.DB_PATH = Path(tmp) / "equities.sqlite"
+                server.init_db()
+                fundamentals = {
+                    "metrics": {
+                        "revenue": {"value": 1_000_000},
+                        "net_income": {"value": 100_000},
+                        "shares_outstanding": {"value": 1_000_000},
+                    }
+                }
+                features = server.valuation_features(10, fundamentals, {}, {})
+                source_timestamps = {"composite_metrics": "refresh-1", "latest_price_date": "2026-06-16"}
+                server.record_sanity_observation("TEST", "refresh-1", "2026-06-16", features, source_timestamps)
+                server.record_sanity_observation("TEST", "refresh-1", "2026-06-16", features, source_timestamps)
+                self.assertEqual(len(server.recent_sanity_observations("TEST")), 1)
+                server.record_sanity_observation("TEST", "refresh-2", "2026-06-17", features, source_timestamps)
+                self.assertEqual(len(server.recent_sanity_observations("TEST")), 2)
+        finally:
+            server.DB_PATH = original_db_path
+
     def test_share_buyback_increases_fundamental_cagr(self):
         base = {
             "technical": {},

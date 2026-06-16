@@ -26,6 +26,15 @@ FORECASTS_DIR = ROOT / "forecasts"
 HTTP_DIR = ROOT / "http"
 SEED_TICKERS = ["ADBE", "AVGO", "BETA", "CRSP", "TSM"]
 MODEL_VERSION = "transparent-ensemble-v1"
+SANITY_POLICY_VERSION = "valuation-sanity-v1"
+LARGEST_KNOWN_MARKET_CAP_USD = 5_000_000_000_000
+MARKET_CAP_SANITY_BUFFER = 1.10
+MAX_EXPECTED_MARKET_CAP_USD = LARGEST_KNOWN_MARKET_CAP_USD * MARKET_CAP_SANITY_BUFFER
+MIN_SANITY_SHARE_PRICE = 0.01
+MAX_SANITY_SHARE_PRICE = 1_000_000
+MIN_SANITY_SHARES_OUTSTANDING = 100_000
+MAX_SANITY_SHARES_OUTSTANDING = 1_000_000_000_000
+PROVIDER_MARKET_CAP_MISMATCH_THRESHOLD = 0.25
 USER_AGENT = os.environ.get(
     "SEC_USER_AGENT",
     "equities-decision-support/1.0 contact@example.com",
@@ -51,9 +60,17 @@ def ensure_dirs() -> None:
     HTTP_DIR.mkdir(exist_ok=True)
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 def connect() -> sqlite3.Connection:
     ensure_dirs()
-    db = sqlite3.connect(DB_PATH)
+    db = sqlite3.connect(DB_PATH, factory=ClosingConnection)
     db.row_factory = sqlite3.Row
     return db
 
@@ -104,6 +121,22 @@ def init_db() -> None:
                 max_drawdown_pct real,
                 max_upside_pct real,
                 primary key (forecast_id, horizon)
+            );
+            create table if not exists sanity_observations (
+                ticker text not null,
+                observed_at text not null,
+                metrics_refreshed_at text not null,
+                latest_price_date text,
+                current_price real,
+                shares_outstanding real,
+                computed_market_cap real,
+                provider_market_cap real,
+                usable_market_cap real,
+                policy_version text not null,
+                status text not null,
+                flags text not null,
+                source_timestamps text not null,
+                primary key (ticker, metrics_refreshed_at, policy_version)
             );
             """
         )
@@ -436,6 +469,131 @@ def flatten_raw_number(item: Any) -> float | None:
     return safe_float(item)
 
 
+def compact_money(value: float | None) -> str:
+    if value is None or not math.isfinite(value):
+        return "unavailable"
+    absolute = abs(value)
+    if absolute >= 1_000_000_000_000:
+        return f"${value / 1_000_000_000_000:.2f}T"
+    if absolute >= 1_000_000_000:
+        return f"${value / 1_000_000_000:.2f}B"
+    if absolute >= 1_000_000:
+        return f"${value / 1_000_000:.2f}M"
+    return f"${value:,.2f}"
+
+
+def sanity_policy() -> dict[str, Any]:
+    return {
+        "version": SANITY_POLICY_VERSION,
+        "largest_known_market_cap_usd": LARGEST_KNOWN_MARKET_CAP_USD,
+        "max_expected_market_cap_usd": MAX_EXPECTED_MARKET_CAP_USD,
+        "share_price_range": [MIN_SANITY_SHARE_PRICE, MAX_SANITY_SHARE_PRICE],
+        "shares_outstanding_range": [MIN_SANITY_SHARES_OUTSTANDING, MAX_SANITY_SHARES_OUTSTANDING],
+        "provider_market_cap_mismatch_threshold": PROVIDER_MARKET_CAP_MISMATCH_THRESHOLD,
+    }
+
+
+def sanity_flag(metric: str, code: str, severity: str, message: str, value: float | None = None) -> dict[str, Any]:
+    flag: dict[str, Any] = {
+        "metric": metric,
+        "code": code,
+        "severity": severity,
+        "message": message,
+    }
+    if value is not None:
+        flag["value"] = value
+    return flag
+
+
+def valuation_sanity(
+    current_price: float | None,
+    shares_outstanding: float | None,
+    computed_market_cap: float | None,
+    provider_market_cap: float | None,
+) -> dict[str, Any]:
+    flags = []
+    usable_market_cap = computed_market_cap
+
+    if current_price is None or not math.isfinite(current_price):
+        flags.append(sanity_flag("current_price", "missing_current_price", "error", "Current share price sanity check failed: value is unavailable."))
+    elif current_price < MIN_SANITY_SHARE_PRICE or current_price > MAX_SANITY_SHARE_PRICE:
+        flags.append(
+            sanity_flag(
+                "current_price",
+                "current_price_out_of_range",
+                "error",
+                f"Current share price sanity check failed: {compact_money(current_price)} is outside the expected range "
+                f"{compact_money(MIN_SANITY_SHARE_PRICE)} to {compact_money(MAX_SANITY_SHARE_PRICE)}.",
+                current_price,
+            )
+        )
+
+    if shares_outstanding is None or not math.isfinite(shares_outstanding):
+        flags.append(sanity_flag("shares_outstanding", "missing_shares_outstanding", "error", "Shares outstanding sanity check failed: value is unavailable."))
+    elif shares_outstanding < MIN_SANITY_SHARES_OUTSTANDING or shares_outstanding > MAX_SANITY_SHARES_OUTSTANDING:
+        flags.append(
+            sanity_flag(
+                "shares_outstanding",
+                "shares_outstanding_out_of_range",
+                "error",
+                f"Shares outstanding sanity check failed: {shares_outstanding:,.0f} is outside the expected range "
+                f"{MIN_SANITY_SHARES_OUTSTANDING:,.0f} to {MAX_SANITY_SHARES_OUTSTANDING:,.0f}.",
+                shares_outstanding,
+            )
+        )
+
+    if computed_market_cap is None or not math.isfinite(computed_market_cap):
+        flags.append(
+            sanity_flag(
+                "market_cap",
+                "missing_computed_market_cap",
+                "error",
+                "Market cap sanity check failed: current share price times shares outstanding is unavailable; valuation ratios suppressed.",
+            )
+        )
+    elif computed_market_cap > MAX_EXPECTED_MARKET_CAP_USD:
+        flags.append(
+            sanity_flag(
+                "market_cap",
+                "market_cap_above_world_max",
+                "error",
+                f"Market cap sanity check failed: computed {compact_money(computed_market_cap)} exceeds max expected "
+                f"{compact_money(MAX_EXPECTED_MARKET_CAP_USD)}; valuation ratios suppressed. Suspect ADR/share-unit mismatch.",
+                computed_market_cap,
+            )
+        )
+
+    if (
+        provider_market_cap is not None
+        and math.isfinite(provider_market_cap)
+        and computed_market_cap is not None
+        and math.isfinite(computed_market_cap)
+        and computed_market_cap > 0
+    ):
+        mismatch = abs(provider_market_cap - computed_market_cap) / computed_market_cap
+        if mismatch > PROVIDER_MARKET_CAP_MISMATCH_THRESHOLD:
+            flags.append(
+                sanity_flag(
+                    "market_cap",
+                    "provider_market_cap_mismatch",
+                    "warning",
+                    f"Provider market cap differs from computed market cap by {mismatch:.1%}; computed market cap remains canonical.",
+                    provider_market_cap,
+                )
+            )
+
+    has_errors = any(flag["severity"] == "error" for flag in flags)
+    if has_errors:
+        usable_market_cap = None
+    status = "fail" if has_errors else "warn" if flags else "pass"
+    return {
+        "policy": sanity_policy(),
+        "status": status,
+        "flags": flags,
+        "usable_market_cap": usable_market_cap,
+    }
+
+
 def collect_market_metrics(ticker: str, prices: list[dict[str, Any]]) -> dict[str, Any]:
     summary = yahoo_quote_summary(ticker)
     financial = summary.get("financialData", {}) or {}
@@ -491,6 +649,85 @@ def latest_metrics(ticker: str) -> dict[str, Any] | None:
     with connect() as db:
         row = db.execute("select payload from metrics where ticker = ?", (ticker.upper(),)).fetchone()
     return json.loads(row["payload"]) if row else None
+
+
+def record_sanity_observation(
+    ticker: str,
+    metrics_refreshed_at: str | None,
+    latest_price_date: str | None,
+    valuation: dict[str, Any],
+    source_timestamps: dict[str, Any],
+) -> None:
+    sanity = valuation.get("sanity", {}) or {}
+    policy = sanity.get("policy", {}) or {}
+    observed_at = iso_now()
+    dedupe_timestamp = metrics_refreshed_at or observed_at
+    params = (
+        ticker.upper(),
+        observed_at,
+        dedupe_timestamp,
+        latest_price_date,
+        safe_float(valuation.get("current_price")),
+        safe_float(valuation.get("shares_outstanding")),
+        safe_float(valuation.get("computed_market_cap")),
+        safe_float(valuation.get("provider_market_cap")),
+        safe_float(valuation.get("market_cap")),
+        policy.get("version") or SANITY_POLICY_VERSION,
+        sanity.get("status") or "unknown",
+        json.dumps(sanity.get("flags", []), sort_keys=True),
+        json.dumps(source_timestamps, sort_keys=True),
+    )
+
+    def insert() -> None:
+        with connect() as db:
+            db.execute(
+                """
+                insert or ignore into sanity_observations(
+                    ticker, observed_at, metrics_refreshed_at, latest_price_date,
+                    current_price, shares_outstanding, computed_market_cap, provider_market_cap,
+                    usable_market_cap, policy_version, status, flags, source_timestamps
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                params,
+            )
+
+    try:
+        insert()
+    except sqlite3.OperationalError as exc:
+        if "sanity_observations" not in str(exc):
+            raise
+        init_db()
+        insert()
+
+
+def recent_sanity_observations(ticker: str, limit: int = 10) -> list[dict[str, Any]]:
+    try:
+        with connect() as db:
+            rows = db.execute(
+                """
+                select ticker, observed_at, metrics_refreshed_at, latest_price_date,
+                       current_price, shares_outstanding, computed_market_cap, provider_market_cap,
+                       usable_market_cap, policy_version, status, flags, source_timestamps
+                from sanity_observations
+                where ticker = ?
+                order by observed_at desc
+                limit ?
+                """,
+                (ticker.upper(), limit),
+            ).fetchall()
+    except sqlite3.OperationalError as exc:
+        if "sanity_observations" not in str(exc):
+            raise
+        init_db()
+        return []
+    observations = []
+    for row in rows:
+        item = dict(row)
+        item["flags"] = json.loads(item.get("flags") or "[]")
+        item["source_timestamps"] = json.loads(item.get("source_timestamps") or "{}")
+        observations.append(item)
+    return observations
 
 
 def pct_change(start: float | None, end: float | None) -> float | None:
@@ -627,9 +864,10 @@ def valuation_features(
     shares = safe_float((metrics.get("shares_outstanding") or metrics.get("weighted_diluted_shares") or {}).get("value"))
     if shares is None and share_history:
         shares = safe_float(share_history[-1].get("shares"))
-    market_cap = safe_float(market.get("market_cap"))
-    if not market_cap and current and shares:
-        market_cap = current * shares
+    provider_market_cap = safe_float(market.get("market_cap"))
+    computed_market_cap = current * shares if current is not None and shares is not None else None
+    sanity = valuation_sanity(current, shares, computed_market_cap, provider_market_cap)
+    market_cap = safe_float(sanity.get("usable_market_cap"))
     derived_revenue_cagr = cagr_from_history(revenue_history, "revenue")
     derived_share_change_cagr = cagr_from_history(share_history, "shares")
     manual_revenue_cagr = assumption_float(company, "revenue_forecast_cagr")
@@ -654,9 +892,12 @@ def valuation_features(
         assumptions.append("Share count forecast unavailable; assuming no issuance or buyback.")
     return {
         "market_cap": market_cap,
+        "computed_market_cap": computed_market_cap,
+        "provider_market_cap": provider_market_cap,
         "current_price": current,
         "latest_revenue": revenue,
         "shares_outstanding": shares,
+        "sanity": sanity,
         "revenue_history": revenue_history,
         "share_history": share_history,
         "revenue_forecast_cagr": revenue_cagr,
@@ -710,11 +951,18 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
     current = safe_float(market.get("current_price")) or current_price(prices)
     if not current:
         raise ValueError(f"No current price available for {ticker}")
+    source_timestamps = {
+        "composite_metrics": metrics.get("refreshed_at"),
+        "fundamentals": fundamentals.get("fetched_at"),
+        "market": market.get("fetched_at"),
+        "latest_price_date": prices[-1]["date"] if prices else None,
+    }
 
     returns = daily_returns(prices)
     vol = annualized_volatility(returns)
     event_risk = estimate_event_risk(market)
     valuation = valuation_features(current, fundamentals, market, company)
+    record_sanity_observation(ticker, metrics.get("refreshed_at"), source_timestamps["latest_price_date"], valuation, source_timestamps)
     analyst = market.get("analyst_targets", {})
     features = {
         "technical": {
@@ -736,6 +984,7 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
     warnings = []
     warnings.extend(fundamentals.get("warnings", []))
     warnings.extend(valuation.get("valuation_assumptions", []))
+    warnings.extend(flag.get("message", "") for flag in valuation.get("sanity", {}).get("flags", []) if flag.get("message"))
     if len(prices) < 252:
         warnings.append("Insufficient one-year price history; confidence reduced.")
     if analyst.get("target_mean") is None:
@@ -758,12 +1007,7 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
         "created_at": iso_now(),
         "current_date": today_iso(),
         "model_version": MODEL_VERSION,
-        "source_timestamps": {
-            "composite_metrics": metrics.get("refreshed_at"),
-            "fundamentals": fundamentals.get("fetched_at"),
-            "market": market.get("fetched_at"),
-            "latest_price_date": prices[-1]["date"] if prices else None,
-        },
+        "source_timestamps": source_timestamps,
         "current_price": current,
         "horizons": horizons,
         "features": features,
@@ -1282,6 +1526,7 @@ def company_detail(ticker: str) -> dict[str, Any]:
         "metrics": metrics,
         "live_forecast": live_forecast,
         "forecasts": load_forecasts(ticker),
+        "sanity_observations": recent_sanity_observations(ticker),
         "histogram": histogram(ticker),
     }
 

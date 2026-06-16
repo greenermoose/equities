@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-16 — Valuation sanity checks and market-cap records
+
+- Made market cap canonical as `current_share_price * shares_outstanding`, keeping any provider-reported market cap only as reference evidence.
+- Added a centralized valuation sanity policy that flags impossible or suspect inputs: out-of-range share price or share count, a computed market cap above the world-largest-company ceiling ($5.0T anchor with a 10% buffer → $5.5T fail threshold), and a warning when provider and computed market cap differ by more than 25%.
+- Suppressed P/S and P/E and set the usable market cap to unavailable when inputs fail sanity, while preserving the raw computed/provider values and flags in the forecast payload and surfacing each flag as a forecast warning.
+- Added a `sanity_observations` SQLite table and recorded one observation per ticker per metrics refresh and policy version, deduped so board polling does not spam the table; exposed recent observations in company detail.
+- Rendered the **Valuation** tab with a compact flagged state beside Current share price, Shares outstanding, and Market cap, plus a "Recent sanity observations" table.
+- Confirmed the motivating case: `TSM` trips the ceiling at ~$11.10T because the NYSE ADR price (427.96) is multiplied by SEC ordinary shares (~25.93B) — a suspected ADR/share-unit mismatch that is flagged and quarantined, not auto-corrected, in this pass.
+- Added unit tests for computed market cap, TSM-like failure with ratio suppression, invalid price/shares flags, provider mismatch warnings, sane-value pass-through, and observation insert/dedup.
+
 ## 2026-06-16 - Transparent valuation model
 
 - Added a company **Valuation** tab that shows the explicit forecast formulas, horizon-by-horizon calculation values, fundamental inputs, technical indicators, confidence range inputs, and missing-data warnings.
