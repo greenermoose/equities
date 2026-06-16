@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equities Decision Support</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f2;
+      --panel: #ffffff;
+      --ink: #171b1f;
+      --muted: #68707a;
+      --line: #dfe3df;
+      --accent: #146c5f;
+      --accent-2: #3d5afe;
+      --warn: #ad5b00;
+      --bad: #a4343a;
+      --good: #217a41;
+      --shadow: 0 10px 28px rgba(22, 28, 35, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: linear-gradient(180deg, #fbfbf8 0, var(--bg) 48%, #eef3f1 100%);
+      letter-spacing: 0;
+    }
+    button, select { font: inherit; }
+    .app {
+      display: grid;
+      grid-template-columns: 248px 1fr;
+      min-height: 100vh;
+    }
+    aside {
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      background: rgba(255,255,255,.72);
+      backdrop-filter: blur(14px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      font-weight: 760;
+      font-size: 18px;
+    }
+    .mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #202b61);
+      font-size: 15px;
+    }
+    .sidebar-actions { display: grid; gap: 8px; margin-bottom: 14px; }
+    .primary, .secondary, .ticker-btn, .tab {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+      padding: 10px 12px;
+      font-weight: 700;
+    }
+    .secondary { padding: 9px 10px; color: var(--muted); }
+    .ticker-list { display: grid; gap: 7px; }
+    .ticker-btn {
+      text-align: left;
+      padding: 10px;
+      min-height: 62px;
+      transition: transform .12s ease, border-color .12s ease;
+    }
+    .ticker-btn:hover { transform: translateY(-1px); border-color: #aeb8b4; }
+    .ticker-btn.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .ticker-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .ticker-symbol { font-weight: 760; }
+    .price { font-variant-numeric: tabular-nums; }
+    .small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    main { padding: 18px 22px 28px; overflow: auto; }
+    header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 16px; }
+    h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.1; }
+    .subtitle { color: var(--muted); max-width: 780px; line-height: 1.4; }
+    .date-chip {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.68);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .metric, .panel, .card {
+      background: rgba(255,255,255,.82);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .metric { padding: 11px 12px; min-height: 78px; }
+    .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .value { font-size: 20px; font-weight: 760; font-variant-numeric: tabular-nums; }
+    .tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 12px 0; }
+    .tab { padding: 8px 10px; color: var(--muted); }
+    .tab.active { background: #16201f; color: white; border-color: #16201f; }
+    .panel { padding: 14px; }
+    .two-col { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table th, .table td { padding: 9px 7px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .table th { color: var(--muted); font-weight: 680; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 7px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      background: white;
+    }
+    .badge.high { color: var(--good); border-color: #a8d6ba; }
+    .badge.medium { color: var(--warn); border-color: #e5c391; }
+    .badge.low { color: var(--bad); border-color: #e2a4a8; }
+    .chart { width: 100%; height: 220px; display: block; background: #fbfcfa; border: 1px solid var(--line); border-radius: 8px; }
+    .hist { height: 220px; display: flex; align-items: end; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfa; }
+    .bar { flex: 1; min-width: 8px; background: linear-gradient(180deg, var(--accent-2), var(--accent)); border-radius: 5px 5px 2px 2px; position: relative; }
+    .bar:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 6px);
+      transform: translateX(-50%);
+      background: #111;
+      color: white;
+      padding: 5px 7px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 2;
+    }
+    .log { white-space: pre-wrap; max-height: 160px; overflow: auto; background: #111817; color: #d7eee8; border-radius: 8px; padding: 10px; font-size: 12px; }
+    .muted { color: var(--muted); }
+    .stack { display: grid; gap: 10px; }
+    .card { padding: 11px; box-shadow: none; }
+    .empty { color: var(--muted); padding: 24px; text-align: center; }
+    @media (max-width: 920px) {
+      .app { grid-template-columns: 1fr; }
+      aside { position: static; border-right: 0; border-bottom: 1px solid var(--line); }
+      .ticker-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric-grid, .two-col, .three-col { grid-template-columns: 1fr; }
+      header { display: grid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand"><div class="mark">EQ</div><div>Equities<br><span class="small">Decision Support</span></div></div>
+      <div class="sidebar-actions">
+        <button class="primary" id="refreshBtn" title="Fetch fresh prices, SEC facts, and market metadata">Refresh Data</button>
+        <button class="secondary" id="evaluateBtn" title="Compare mature forecasts with actual price history">Evaluate Forecasts</button>
+      </div>
+      <div class="ticker-list" id="tickerList"></div>
+    </aside>
+    <main>
+      <header>
+        <div>
+          <h1 id="title">Loading...</h1>
+          <div class="subtitle" id="subtitle">Transparent forecasts, immutable forecast records, and post-horizon accuracy checks.</div>
+        </div>
+        <div class="date-chip" id="dateChip">Current date</div>
+      </header>
+      <section class="metric-grid" id="metricGrid"></section>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="forecasts">Forecasts</button>
+        <button class="tab" data-tab="history">Forecast History</button>
+        <button class="tab" data-tab="accuracy">Model Accuracy</button>
+        <button class="tab" data-tab="price">Price Action</button>
+      </nav>
+      <section class="panel" id="content"></section>
+      <div class="log" id="log" style="display:none"></div>
+    </main>
+  </div>
+
+  <script>
+    const state = { summary: null, selected: null, detail: null, tab: "overview", accuracy: null };
+    const $ = (id) => document.getElementById(id);
+    const money = (n) => Number.isFinite(Number(n)) ? "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "unavailable";
+    const pct = (n) => Number.isFinite(Number(n)) ? (Number(n) * 100).toFixed(1) + "%" : "unavailable";
+    const compact = (n) => {
+      n = Number(n);
+      if (!Number.isFinite(n)) return "unavailable";
+      if (Math.abs(n) >= 1e12) return (n / 1e12).toFixed(2) + "T";
+      if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(2) + "B";
+      if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + "M";
+      return n.toLocaleString();
+    };
+    async function api(path, options) {
+      const res = await fetch(path, options);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      return data;
+    }
+    function showLog(text) {
+      $("log").style.display = "block";
+      $("log").textContent = text;
+    }
+    async function loadSummary() {
+      state.summary = await api("/api/summary");
+      if (!state.selected && state.summary.companies.length) state.selected = state.summary.companies[0].ticker;
+      renderSidebar();
+      $("dateChip").textContent = `Today: ${state.summary.current_date} | ${state.summary.model_version}`;
+      await loadCompany(state.selected);
+    }
+    async function loadCompany(ticker) {
+      state.selected = ticker;
+      state.detail = await api(`/api/company/${ticker}`);
+      renderSidebar();
+      render();
+    }
+    function renderSidebar() {
+      const list = $("tickerList");
+      list.innerHTML = "";
+      for (const c of state.summary.companies) {
+        const btn = document.createElement("button");
+        btn.className = "ticker-btn" + (c.ticker === state.selected ? " active" : "");
+        btn.innerHTML = `<div class="ticker-top"><span class="ticker-symbol">${c.ticker}</span><span class="price">${money(c.latest_price)}</span></div>
+          <div class="small">${c.name}</div>
+          <div class="small">${c.forecast_count} forecast records | ${c.latest_price_date || "no prices"}</div>`;
+        btn.onclick = () => loadCompany(c.ticker);
+        list.appendChild(btn);
+      }
+    }
+    function render() {
+      const d = state.detail;
+      const company = d.company;
+      const metrics = d.metrics || {};
+      const market = metrics.market || {};
+      const fundamentals = metrics.fundamentals || {};
+      const latest = d.forecasts[0];
+      $("title").textContent = `${company.ticker} - ${company.name || company.ticker}`;
+      $("subtitle").textContent = `Data refresh: ${metrics.refreshed_at || "not refreshed"} | Forecasts are stored as immutable JSON records.`;
+      renderMetrics(market, fundamentals, latest);
+      if (state.tab === "overview") renderOverview();
+      if (state.tab === "forecasts") renderForecasts();
+      if (state.tab === "history") renderHistory();
+      if (state.tab === "accuracy") renderAccuracy();
+      if (state.tab === "price") renderPrice();
+    }
+    function renderMetrics(market, fundamentals, latest) {
+      const m = fundamentals.metrics || {};
+      $("metricGrid").innerHTML = [
+        metric("Latest Price", money(market.current_price), market.fetched_at || "refresh needed"),
+        metric("Revenue", compact(m.revenue?.value), m.revenue?.period_end || "SEC unavailable"),
+        metric("Net Margin", pct(m.net_margin?.value), m.net_margin ? "derived from SEC facts" : "unavailable"),
+        metric("Shares", compact(m.shares_outstanding?.value || m.weighted_diluted_shares?.value), m.shares_outstanding?.period_end || "unavailable"),
+        metric("Latest 1Y Base", latest?.horizons?.["1y"] ? money(latest.horizons["1y"].base) : "no forecast", latest?.created_at || "generate one")
+      ].join("");
+    }
+    function metric(label, value, note) {
+      return `<div class="metric"><div class="label">${label}</div><div class="value">${value}</div><div class="small">${note || ""}</div></div>`;
+    }
+    function renderOverview() {
+      const d = state.detail, metrics = d.metrics || {}, fundamentals = metrics.fundamentals || {}, market = metrics.market || {};
+      const warnings = [...(fundamentals.warnings || [])], analyst = market.analyst_targets || {};
+      $("content").innerHTML = `<div class="two-col">
+        <div class="stack">
+          <div class="card"><div class="label">Thesis</div><div>${d.company.thesis || "<span class='muted'>No thesis entered yet. Edit companies/" + d.company.ticker + ".json to preserve durable research notes.</span>"}</div></div>
+          <div class="card"><div class="label">Source Health</div><table class="table">
+            <tr><th>Source</th><th>Status</th><th>Timestamp</th></tr>
+            <tr><td>SEC fundamentals</td><td>${fundamentals.source_state || "missing"}</td><td>${fundamentals.fetched_at || "unavailable"}</td></tr>
+            <tr><td>Market data</td><td>${market.source_state || "missing"}</td><td>${market.fetched_at || "unavailable"}</td></tr>
+          </table></div>
+          <div class="card"><div class="label">Warnings</div>${warnings.length ? warnings.map(w => `<div class="small">${escapeHtml(w)}</div>`).join("") : "<span class='muted'>No warnings recorded.</span>"}</div>
+        </div>
+        <div class="stack">
+          <div class="card"><div class="label">Analyst Targets</div><div class="three-col">${metric("Low", money(analyst.target_low), "")}${metric("Mean", money(analyst.target_mean), "")}${metric("High", money(analyst.target_high), "")}</div></div>
+          <div class="card"><div class="label">Upcoming Event</div><div class="value">${market.next_earnings_date || "unavailable"}</div><div class="small">Event risk widens forecast intervals when earnings are near.</div></div>
+        </div>
+      </div>`;
+    }
+    function renderForecasts() {
+      const latest = state.detail.forecasts[0];
+      const rows = latest ? horizonRows(latest) : `<tr><td colspan="7" class="empty">No forecast has been recorded for ${state.selected}.</td></tr>`;
+      $("content").innerHTML = `<div class="stack">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+          <div><div class="label">Current Forecast</div><div class="small">${latest ? `${latest.forecast_id} | ${latest.created_at} | ${latest.model_version}` : "Generate an immutable record to begin tracking model accuracy."}</div></div>
+          <button class="primary" onclick="generateForecast()">Record Forecast</button>
+        </div>
+        <table class="table"><tr><th>Horizon</th><th>Target Date</th><th>Lower</th><th>Base</th><th>Upper</th><th>Confidence</th><th>Drivers</th></tr>${rows}</table>
+        ${latest ? `<div class="card"><div class="label">Warnings</div>${(latest.warnings || []).map(w => `<div class="small">${escapeHtml(w)}</div>`).join("") || "<span class='muted'>None</span>"}</div>` : ""}
+      </div>`;
+    }
+    function horizonRows(forecast) {
+      return Object.entries(forecast.horizons).map(([h, v]) => {
+        const d = v.drivers || {};
+        return `<tr><td><strong>${h}</strong></td><td>${v.target_date}</td><td>${money(v.lower)}</td><td>${money(v.base)}</td><td>${money(v.upper)}</td>
+          <td><span class="badge ${v.confidence_label}">${v.confidence_label} ${v.confidence}</span></td>
+          <td class="small">tech ${pct(d.technical_weight)} | fund ${pct(d.fundamental_weight)} | event +${pct(d.event_risk_widening)}</td></tr>`;
+      }).join("");
+    }
+    function renderHistory() {
+      const forecasts = state.detail.forecasts;
+      $("content").innerHTML = forecasts.length ? `<table class="table"><tr><th>Created</th><th>ID</th><th>Price</th><th>13w</th><th>1y</th><th>Warnings</th></tr>
+        ${forecasts.map(f => `<tr><td>${f.created_at}</td><td>${f.forecast_id}</td><td>${money(f.current_price)}</td><td>${rangeText(f.horizons["13w"])}</td><td>${rangeText(f.horizons["1y"])}</td><td>${(f.warnings || []).length}</td></tr>`).join("")}</table>` : `<div class="empty">No forecast records yet.</div>`;
+    }
+    function rangeText(h) { return h ? `${money(h.lower)} / ${money(h.base)} / ${money(h.upper)}` : "unavailable"; }
+    async function renderAccuracy() {
+      if (!state.accuracy) state.accuracy = await api("/api/accuracy");
+      const summary = state.accuracy.summary.filter(r => r.ticker === state.selected);
+      const outcomes = state.accuracy.outcomes.filter(r => r.ticker === state.selected);
+      $("content").innerHTML = `<div class="stack">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+          <div><div class="label">Calibration</div><div class="small">A 90% interval should contain actual prices roughly 90% of the time after enough mature forecasts.</div></div>
+          <button class="secondary" onclick="evaluateForecasts()">Evaluate Mature Forecasts</button>
+        </div>
+        <table class="table"><tr><th>Horizon</th><th>Model</th><th>Count</th><th>Interval Accuracy</th><th>Mean Abs Base Error</th></tr>
+          ${summary.length ? summary.map(r => `<tr><td>${r.horizon}</td><td>${r.model_version}</td><td>${r.n}</td><td>${pct(r.interval_accuracy)}</td><td>${pct(r.mean_abs_base_error)}</td></tr>`).join("") : `<tr><td colspan="5" class="empty">No mature evaluated forecasts yet.</td></tr>`}</table>
+        <table class="table"><tr><th>Forecast</th><th>Horizon</th><th>Target</th><th>Actual</th><th>Inside</th><th>Drawdown</th><th>Upside</th></tr>
+          ${outcomes.length ? outcomes.map(o => `<tr><td>${o.forecast_id}</td><td>${o.horizon}</td><td>${o.target_date}</td><td>${money(o.actual_price)}</td><td>${o.inside_interval ? "yes" : "no"}</td><td>${pct(o.max_drawdown_pct)}</td><td>${pct(o.max_upside_pct)}</td></tr>`).join("") : `<tr><td colspan="7" class="empty">No outcome records.</td></tr>`}</table>
+      </div>`;
+    }
+    function renderPrice() {
+      const hist = state.detail.histogram || { bins: [] };
+      const max = Math.max(1, ...hist.bins.map(b => b.count));
+      $("content").innerHTML = `<div class="two-col">
+        <div class="stack"><div><div class="label">Price History</div><canvas class="chart" id="priceChart" width="900" height="260"></canvas></div><div class="small">Latest ${state.detail.prices.length} cached trading days. Refresh data to extend the local cache.</div></div>
+        <div><div class="label">Rolling 13-Week Return Histogram</div><div class="hist">${hist.bins.map(b => `<div class="bar" style="height:${Math.max(4, b.count / max * 100)}%" data-tip="${pct(b.low)} to ${pct(b.high)}: ${b.count}"></div>`).join("") || "<div class='empty'>No histogram yet.</div>"}</div><div class="small">${hist.count || 0} rolling windows over the past ${hist.years || 2} years.</div></div>
+      </div>`;
+      drawPriceChart();
+    }
+    function drawPriceChart() {
+      const canvas = $("priceChart");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d"), prices = state.detail.prices || [];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fbfcfa"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const closes = prices.map(p => Number(p.close)).filter(Number.isFinite);
+      if (closes.length < 2) return;
+      const min = Math.min(...closes), max = Math.max(...closes), pad = 24;
+      ctx.strokeStyle = "#dfe3df"; ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) { const y = pad + i * ((canvas.height - pad * 2) / 3); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(canvas.width - pad, y); ctx.stroke(); }
+      ctx.strokeStyle = "#146c5f"; ctx.lineWidth = 2; ctx.beginPath();
+      closes.forEach((v, i) => {
+        const x = pad + i / (closes.length - 1) * (canvas.width - pad * 2);
+        const y = canvas.height - pad - ((v - min) / Math.max(.0001, max - min)) * (canvas.height - pad * 2);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.fillStyle = "#68707a"; ctx.font = "12px system-ui"; ctx.fillText(money(max), pad, 16); ctx.fillText(money(min), pad, canvas.height - 8);
+    }
+    async function generateForecast() {
+      showLog(`Recording forecast for ${state.selected}...`);
+      const result = await api(`/api/forecast/${state.selected}`, { method: "POST" });
+      showLog(`Recorded immutable forecast ${result.forecast_id} for ${state.selected}.`);
+      await loadSummary();
+    }
+    async function evaluateForecasts() {
+      showLog("Evaluating mature forecasts...");
+      const result = await api("/api/evaluate", { method: "POST" });
+      state.accuracy = await api("/api/accuracy");
+      showLog(`Evaluated ${result.evaluated.length} horizon outcomes. Skipped ${result.skipped.length} not-yet-mature or missing cases.`);
+      render();
+    }
+    async function refreshData() {
+      showLog("Refreshing seed tickers. This can take a moment because SEC and market endpoints are live.");
+      const result = await api("/api/refresh", { method: "POST" });
+      showLog(`Refreshed ${result.refreshed.length} tickers.`);
+      await loadSummary();
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[ch]));
+    }
+    $("refreshBtn").onclick = refreshData;
+    $("evaluateBtn").onclick = evaluateForecasts;
+    $("tabs").onclick = (event) => {
+      const tab = event.target.closest(".tab");
+      if (!tab) return;
+      state.tab = tab.dataset.tab;
+      document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+      render();
+    };
+    loadSummary().catch(err => {
+      showLog(err.stack || String(err));
+      $("title").textContent = "Unable to load app";
+    });
+  </script>
+</body>
+</html>

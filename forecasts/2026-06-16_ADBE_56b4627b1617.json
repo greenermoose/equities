@@ -1,0 +1,135 @@
+{
+  "assumptions": [
+    "Intervals are scenario ranges for personal decision support, not trading instructions.",
+    "Short horizons emphasize empirical price action; long horizons emphasize fundamentals and valuation.",
+    "Missing inputs reduce confidence rather than being silently filled as zero."
+  ],
+  "created_at": "2026-06-16T19:31:31+00:00",
+  "current_date": "2026-06-16",
+  "current_price": 207.13499450683594,
+  "features": {
+    "analyst_targets": {
+      "number_of_analysts": null,
+      "recommendation": null,
+      "target_high": null,
+      "target_low": null,
+      "target_mean": null
+    },
+    "event_risk": {
+      "interval_widening": 0.0,
+      "next_earnings_date": null
+    },
+    "fundamental": {
+      "balance_sheet_strength": 0.384792703704941,
+      "gross_margin": 0.8919613176186159,
+      "market_cap": 82336160316.46729,
+      "net_margin": 0.25868842550619525,
+      "price_to_earnings": 48.093551586721546,
+      "price_to_sales": 12.441245136969973,
+      "shares_outstanding": 397500000.0
+    },
+    "technical": {
+      "annualized_volatility": 0.3474095315592397,
+      "ma_200_position": -0.302229064161308,
+      "ma_50_position": -0.14905673099679484,
+      "price_history_days": 2514,
+      "return_20d": -0.18973949694343728,
+      "return_252d": -0.4711626879591603,
+      "return_65d": -0.16920027104974733
+    }
+  },
+  "forecast_id": "56b4627b1617",
+  "horizons": {
+    "10y": {
+      "base": 734.18,
+      "confidence": 34,
+      "confidence_label": "low",
+      "drivers": {
+        "analyst_return": null,
+        "event_risk_widening": 0.0,
+        "fundamental_return": 2.8364,
+        "fundamental_weight": 0.9,
+        "technical_base_return": -0.083,
+        "technical_weight": 0.1
+      },
+      "lower": 111.93,
+      "target_date": "2036-02-12",
+      "upper": 1208.93
+    },
+    "13w": {
+      "base": 193.47,
+      "confidence": 68,
+      "confidence_label": "medium",
+      "drivers": {
+        "analyst_return": null,
+        "event_risk_widening": 0.0,
+        "fundamental_return": 0.0342,
+        "fundamental_weight": 0.15,
+        "technical_base_return": -0.0836,
+        "technical_weight": 0.85
+      },
+      "lower": 134.11,
+      "target_date": "2026-09-15",
+      "upper": 270.1
+    },
+    "1y": {
+      "base": 215.33,
+      "confidence": 68,
+      "confidence_label": "medium",
+      "drivers": {
+        "analyst_return": null,
+        "event_risk_widening": 0.0,
+        "fundamental_return": 0.1439,
+        "fundamental_weight": 0.55,
+        "technical_base_return": -0.088,
+        "technical_weight": 0.45
+      },
+      "lower": 96.6,
+      "target_date": "2027-06-04",
+      "upper": 367.8
+    },
+    "3y": {
+      "base": 286.03,
+      "confidence": 68,
+      "confidence_label": "medium",
+      "drivers": {
+        "analyst_return": null,
+        "event_risk_widening": 0.0,
+        "fundamental_return": 0.4968,
+        "fundamental_weight": 0.8,
+        "technical_base_return": -0.083,
+        "technical_weight": 0.2
+      },
+      "lower": 80.37,
+      "target_date": "2029-05-10",
+      "upper": 534.86
+    },
+    "5y": {
+      "base": 373.35,
+      "confidence": 34,
+      "confidence_label": "low",
+      "drivers": {
+        "analyst_return": null,
+        "event_risk_widening": 0.0,
+        "fundamental_return": 0.9587,
+        "fundamental_weight": 0.85,
+        "technical_base_return": -0.083,
+        "technical_weight": 0.15
+      },
+      "lower": 107.85,
+      "target_date": "2031-04-15",
+      "upper": 638.84
+    }
+  },
+  "model_version": "transparent-ensemble-v1",
+  "source_timestamps": {
+    "composite_metrics": "2026-06-16T19:31:08+00:00",
+    "fundamentals": "2026-06-16T19:31:08+00:00",
+    "latest_price_date": "2026-06-16",
+    "market": null
+  },
+  "ticker": "ADBE",
+  "warnings": [
+    "Analyst target data unavailable."
+  ]
+}
