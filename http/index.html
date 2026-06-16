@@ -137,12 +137,19 @@
     .bar:hover::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%);
       background: #111; color: #fff; padding: 5px 7px; border-radius: 6px; font-size: 11px; white-space: nowrap; z-index: 2; }
     .two-col { display: grid; grid-template-columns: 1.25fr .75fr; gap: 12px; }
+    .formula { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; background: #f7f8f6; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; overflow-x: auto; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    .facts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .fact { border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; background: #fafbf9; min-width: 0; }
+    .fact .k { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .fact .v { font-size: 16px; font-weight: 730; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .warning-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
     .hide { display: none !important; }
     @media (max-width: 900px) {
       .company { grid-template-columns: 1fr; } .rail { display: none; }
       .grid-row { grid-template-columns: 28px 1.4fr 70px 70px 84px; }
       .grid-row .col-range, .grid-row .col-conv { display: none; }
-      .metric-grid { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); } .two-col, .facts-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -217,6 +224,10 @@
     function signalFor(ticker) {
       const row = (state.board?.companies || []).find(c => c.ticker === ticker);
       return row ? row.signal : null;
+    }
+    function liveForecast() {
+      const d = state.detail[state.selected] || {};
+      return d.live_forecast && !d.live_forecast.error ? d.live_forecast : signalFor(state.selected);
     }
 
     /* ---------- relative time + polling ---------- */
@@ -383,8 +394,8 @@
           <span class="rail-exp ${t === "good" ? "exp good" : t === "bad" ? "exp bad" : "muted"}">${Number.isFinite(e) ? signed(e) : "—"}</span></div>`;
       }).join("");
 
-      const tabs = ["snapshot", "forecast", "price", "history", "accuracy"];
-      const tabLabels = { snapshot: "Snapshot", forecast: "Forecast", price: "Price action", history: "History", accuracy: "Accuracy" };
+      const tabs = ["snapshot", "forecast", "valuation", "price", "history", "accuracy"];
+      const tabLabels = { snapshot: "Snapshot", forecast: "Forecast", valuation: "Valuation", price: "Price action", history: "History", accuracy: "Accuracy" };
       $("root").innerHTML = `<div class="company">
         <div class="rail">
           <div class="back" id="backBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg> Board</div>
@@ -398,12 +409,16 @@
         </main></div>`;
       $("backBtn").addEventListener("click", backToBoard);
       document.querySelectorAll(".rail-row").forEach(r => r.addEventListener("click", () => openCompany(r.dataset.ticker)));
-      document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => { state.tab = t.dataset.tab; renderTab(); }));
+      document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+        state.tab = t.dataset.tab;
+        document.querySelectorAll(".tab").forEach(el => el.classList.toggle("active", el.dataset.tab === state.tab));
+        renderTab();
+      }));
       renderTab();
     }
 
     function renderTab() {
-      ({ snapshot: renderSnapshot, forecast: renderForecastTab, price: renderPrice, history: renderHistory, accuracy: renderAccuracy }[state.tab])();
+      ({ snapshot: renderSnapshot, forecast: renderForecastTab, valuation: renderValuation, price: renderPrice, history: renderHistory, accuracy: renderAccuracy }[state.tab])();
     }
 
     function whyText(sig) {
@@ -498,6 +513,117 @@
       $("tabContent").innerHTML = `<div class="card"><div class="label">Forecast by horizon</div>
         ${rows || `<div class="empty">No live forecast available.</div>`}
         <div class="muted" style="font-size:12px;margin-top:10px">Bar = scenario range, green tick = base case, dark tick = today's price. Expected % is base vs. current.</div></div>`;
+    }
+
+    function isNumericValue(n) {
+      return n !== null && n !== undefined && n !== "" && Number.isFinite(Number(n));
+    }
+    function fmtPlain(n, d = 2) {
+      return isNumericValue(n) ? Number(n).toLocaleString(undefined, { maximumFractionDigits: d }) : "unavailable";
+    }
+    function moneyCompact(n) {
+      return isNumericValue(n) ? "$" + compact(Number(n)) : "unavailable";
+    }
+    function pctMaybe(n) {
+      return isNumericValue(n) ? pct(n) : "unavailable";
+    }
+    function sourceNote(source) {
+      if (!source) return "";
+      return `<div class="muted" style="font-size:11px;margin-top:2px">${esc(source)}</div>`;
+    }
+    function factCard(label, value, source = "") {
+      return `<div class="fact"><div class="k">${esc(label)}</div><div class="v">${value}</div>${sourceNote(source)}</div>`;
+    }
+
+    function renderValuation() {
+      const fc = liveForecast();
+      if (!fc || fc.error) {
+        $("tabContent").innerHTML = `<div class="card"><div class="empty">${fc?.error ? esc(fc.error) : "No live forecast available."}</div></div>`;
+        return;
+      }
+      const f = fc.features?.fundamental || {};
+      const t = fc.features?.technical || {};
+      const ev = fc.features?.event_risk || {};
+      const horizons = fc.horizons || {};
+      const traces = fc.calculation_trace?.horizons || {};
+      const formulas = fc.valuation_model?.formulas || {};
+      const order = ["13w", "1y", "3y", "5y", "10y"];
+      const labels = { "13w": "13 wk", "1y": "1 yr", "3y": "3 yr", "5y": "5 yr", "10y": "10 yr" };
+      const formulaText = [
+        "revenue_forecast = " + (formulas.revenue_forecast || "latest_revenue * (1 + revenue_cagr) ^ years"),
+        "forecast_shares = " + (formulas.forecast_shares || "current_shares * (1 + share_change_cagr) ^ years"),
+        "share_change_effect = " + (formulas.share_change_effect || "current_shares / forecast_shares - 1"),
+        "fundamental_cagr = " + (formulas.fundamental_cagr || "revenue_cagr - share_change_cagr + margin_adjustment + balance_sheet_adjustment + valuation_adjustment"),
+        "fundamental_return = " + (formulas.fundamental_return || "(1 + fundamental_cagr) ^ years - 1"),
+        "technical_return = " + (formulas.technical_return || "average(rolling_return_p50, scaled momentum, moving-average bias)"),
+        "base_return = " + (formulas.base_return || "weighted_average(technical, fundamental, analyst when available)"),
+        "range = lower/base/upper from " + (formulas.lower_return || "volatility and empirical lower bound") + " / " + (formulas.upper_return || "volatility and empirical upper bound"),
+      ].join("\n");
+
+      const horizonRows = order.filter(k => horizons[k]).map(k => {
+        const hz = horizons[k], c = traces[k] || hz.calculation || {};
+        const exp = Number.isFinite(Number(fc.current_price)) ? hz.base / fc.current_price - 1 : null;
+        return `<tr>
+          <td>${labels[k]}</td><td>${money0(fc.current_price)}</td><td>${money0(hz.lower)} / ${money0(hz.base)} / ${money0(hz.upper)}</td>
+          <td>${signed(exp)}</td><td>${pctMaybe(c.technical_return)}</td><td>${pctMaybe(c.fundamental_return)}</td><td>${pctMaybe(c.analyst_return)}</td>
+          <td>${pctMaybe(c.technical_weight)} / ${pctMaybe(c.fundamental_weight)}${Number.isFinite(Number(c.analyst_weight)) ? " / " + pctMaybe(c.analyst_weight) : ""}</td>
+        </tr>`;
+      }).join("");
+
+      const revenueRows = (f.revenue_history || []).slice(-6).map(r => `<tr><td>${esc(r.period_end || "")}</td><td>${moneyCompact(r.revenue)}</td><td>${esc(r.form || r.source || "")}</td></tr>`).join("");
+      const shareRows = (f.share_history || []).slice(-6).map(r => `<tr><td>${esc(r.period_end || "")}</td><td>${fmtPlain(r.shares, 0)}</td><td>${esc(r.form || r.source || "")}</td></tr>`).join("");
+      const forecastRows = order.filter(k => horizons[k]).map(k => {
+        const c = traces[k] || horizons[k].calculation || {};
+        return `<tr><td>${labels[k]}</td><td>${moneyCompact(c.revenue_forecast)}</td><td>${fmtPlain(c.forecast_shares, 0)}</td><td>${pctMaybe(c.share_change_effect)}</td></tr>`;
+      }).join("");
+      const confidenceRows = order.filter(k => horizons[k]).map(k => {
+        const c = traces[k] || horizons[k].calculation || {};
+        return `<tr><td>${labels[k]}</td><td>${pctMaybe(c.volatility_used)}</td><td>${pctMaybe(c.vol_band)}</td><td>${pctMaybe(c.empirical_low)} / ${pctMaybe(c.empirical_high)}</td><td>${pctMaybe(c.event_risk_widening)}</td><td>${horizons[k].confidence || "unavailable"} ${esc(horizons[k].confidence_label || "")}</td></tr>`;
+      }).join("");
+      const warnings = (fc.warnings || []).map(w => `<li>${esc(w)}</li>`).join("");
+
+      $("tabContent").innerHTML = `<div class="stack">
+        <div class="card"><div class="label">Explicit formula</div><div class="formula">${esc(formulaText)}</div></div>
+        <div class="card"><div class="label">Forecast math by horizon</div><div class="table-wrap"><table class="table">
+          <tr><th>Horizon</th><th>Current</th><th>Lower / Base / Upper</th><th>Expected</th><th>Technical</th><th>Fundamental</th><th>Analyst</th><th>Weights</th></tr>
+          ${horizonRows || `<tr><td colspan="8" class="empty">No horizon calculations available.</td></tr>`}
+        </table></div></div>
+        <div class="card"><div class="label">Fundamental indicators</div>
+          <div class="facts-grid">
+            ${factCard("Shares outstanding", fmtPlain(f.shares_outstanding, 0))}
+            ${factCard("Current share price", money(fc.current_price))}
+            ${factCard("Market cap", moneyCompact(f.market_cap))}
+            ${factCard("Latest revenue", moneyCompact(f.latest_revenue))}
+            ${factCard("Revenue forecast CAGR", pctMaybe(f.revenue_forecast_cagr), f.revenue_forecast_cagr_source)}
+            ${factCard("Share issuance/buyback CAGR", pctMaybe(f.share_change_cagr), f.share_change_cagr_source)}
+            ${factCard("Net margin", pctMaybe(f.net_margin))}
+            ${factCard("Gross margin", pctMaybe(f.gross_margin))}
+            ${factCard("Balance sheet strength", pctMaybe(f.balance_sheet_strength))}
+            ${factCard("P/S", Number.isFinite(Number(f.price_to_sales)) ? fmtPlain(f.price_to_sales, 2) : "unavailable")}
+            ${factCard("P/E", Number.isFinite(Number(f.price_to_earnings)) ? fmtPlain(f.price_to_earnings, 2) : "unavailable")}
+            ${factCard("Next earnings", ev.next_earnings_date ? esc(ev.next_earnings_date) : "unavailable")}
+          </div></div>
+        <div class="two-col">
+          <div class="card"><div class="label">Revenue history</div><div class="table-wrap"><table class="table"><tr><th>Period end</th><th>Revenue</th><th>Source</th></tr>${revenueRows || `<tr><td colspan="3" class="empty">Revenue history unavailable.</td></tr>`}</table></div></div>
+          <div class="card"><div class="label">Share count history</div><div class="table-wrap"><table class="table"><tr><th>Period end</th><th>Shares</th><th>Source</th></tr>${shareRows || `<tr><td colspan="3" class="empty">Share history unavailable.</td></tr>`}</table></div></div>
+        </div>
+        <div class="card"><div class="label">Revenue and share forecasts</div><div class="table-wrap"><table class="table"><tr><th>Horizon</th><th>Forecast revenue</th><th>Forecast shares</th><th>Share change effect</th></tr>${forecastRows || `<tr><td colspan="4" class="empty">Forecast inputs unavailable.</td></tr>`}</table></div></div>
+        <div class="card"><div class="label">Technical indicators</div>
+          <div class="facts-grid">
+            ${factCard("20d return", pctMaybe(t.return_20d))}
+            ${factCard("65d return", pctMaybe(t.return_65d))}
+            ${factCard("252d return", pctMaybe(t.return_252d))}
+            ${factCard("Annualized volatility", pctMaybe(t.annualized_volatility))}
+            ${factCard("50d MA position", pctMaybe(t.ma_50_position))}
+            ${factCard("200d MA position", pctMaybe(t.ma_200_position))}
+            ${factCard("Price history days", fmtPlain(t.price_history_days, 0))}
+          </div></div>
+        <div class="card"><div class="label">Confidence range inputs</div><div class="table-wrap"><table class="table">
+          <tr><th>Horizon</th><th>Volatility used</th><th>Vol band</th><th>Empirical low / high</th><th>Event widening</th><th>Confidence</th></tr>
+          ${confidenceRows || `<tr><td colspan="6" class="empty">Confidence inputs unavailable.</td></tr>`}
+        </table></div></div>
+        <div class="card"><div class="label">Warnings and missing inputs</div>${warnings ? `<ul class="warning-list">${warnings}</ul>` : `<div class="muted">No warnings for this forecast.</div>`}</div>
+      </div>`;
     }
 
     function renderPrice() {

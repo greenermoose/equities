@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-16 - Transparent valuation model
+
+- Added a company **Valuation** tab that shows the explicit forecast formulas, horizon-by-horizon calculation values, fundamental inputs, technical indicators, confidence range inputs, and missing-data warnings.
+- Upgraded the forecast model so revenue forecasts, share issuance or buyback assumptions, current shares outstanding, current price, margins, balance sheet strength, valuation ratios, analyst targets, and price-trend indicators are all exposed in the forecast payload.
+- Added SEC-derived annual revenue and share-count histories, auto-derived revenue/share CAGRs, and `companies/{TICKER}.json` manual overrides for revenue growth, share-count change, and history inputs.
+- Added `live_forecast`, `valuation_model`, and `calculation_trace` data to company detail responses, and preserved the same trace in recorded forecast payloads.
+- Added unit tests for annual fact history extraction, CAGR calculation, manual overrides, buyback/share issuance effects, and horizon calculation traces.
+
 ## 2026-06-16 — UI/UX redesign
 
 - Reworked the browser UI into a portfolio-wide **Signal Board** landing view that ranks every company by 13-week expected return, from strongest buy to strongest sell.

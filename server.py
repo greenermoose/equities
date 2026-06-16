@@ -295,6 +295,46 @@ def latest_fact(facts: dict[str, Any], taxonomy: str, tags: list[str], units: li
     return sorted(candidates, key=lambda item: (item.get("end", ""), item.get("filed", "")))[-1]
 
 
+def fact_history(
+    facts: dict[str, Any],
+    taxonomy: str,
+    tags: list[str],
+    units: list[str],
+    value_key: str,
+    annual_only: bool = True,
+) -> list[dict[str, Any]]:
+    taxonomy_facts = facts.get("facts", {}).get(taxonomy, {})
+    by_period: dict[str, dict[str, Any]] = {}
+    for tag in tags:
+        units_map = taxonomy_facts.get(tag, {}).get("units", {})
+        for unit in units:
+            for item in units_map.get(unit, []):
+                val = safe_float(item.get("val"))
+                end = item.get("end")
+                if val is None or not end:
+                    continue
+                form = item.get("form")
+                fp = item.get("fp")
+                frame = item.get("frame")
+                if annual_only and fp != "FY" and form not in {"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}:
+                    continue
+                row = {
+                    "period_end": end,
+                    value_key: val,
+                    "filed": item.get("filed"),
+                    "form": form,
+                    "fy": item.get("fy"),
+                    "fp": fp,
+                    "frame": frame,
+                    "tag": tag,
+                    "unit": unit,
+                }
+                existing = by_period.get(end)
+                if not existing or (row.get("filed") or "") > (existing.get("filed") or ""):
+                    by_period[end] = row
+    return sorted(by_period.values(), key=lambda row: row["period_end"])
+
+
 def collect_fundamentals(ticker: str) -> dict[str, Any]:
     warnings = []
     company = read_json(company_path(ticker), {})
@@ -341,6 +381,29 @@ def collect_fundamentals(ticker: str) -> dict[str, Any]:
                     "form": fact.get("form"),
                     "tag": fact.get("tag"),
                 }
+        result["revenue_history"] = fact_history(
+            facts,
+            "us-gaap",
+            ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet"],
+            ["USD"],
+            "revenue",
+        )[-8:]
+        weighted_shares_history = fact_history(
+            facts,
+            "us-gaap",
+            ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+            ["shares"],
+            "shares",
+        )
+        point_shares_history = fact_history(
+            facts,
+            "dei",
+            ["EntityCommonStockSharesOutstanding"],
+            ["shares"],
+            "shares",
+            annual_only=False,
+        )
+        result["share_history"] = (weighted_shares_history or point_shares_history)[-8:]
         if "revenue" in result["metrics"] and "gross_profit" in result["metrics"]:
             revenue = safe_float(result["metrics"]["revenue"]["value"])
             gross = safe_float(result["metrics"]["gross_profit"]["value"])
@@ -511,17 +574,96 @@ def estimate_event_risk(market: dict[str, Any]) -> float:
     return 0.0
 
 
-def valuation_features(current: float | None, fundamentals: dict[str, Any], market: dict[str, Any]) -> dict[str, Any]:
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def manual_history(company: dict[str, Any], key: str, value_key: str) -> list[dict[str, Any]]:
+    rows = []
+    for item in (company.get("manual_assumptions", {}) or {}).get(key, []) or []:
+        value = safe_float(item.get(value_key))
+        period_end = item.get("period_end")
+        if value is not None and period_end:
+            rows.append({"period_end": str(period_end), value_key: value, "source": "manual_assumptions"})
+    return sorted(rows, key=lambda row: row["period_end"])
+
+
+def cagr_from_history(rows: list[dict[str, Any]], value_key: str, max_years: int = 5) -> float | None:
+    usable = [row for row in rows if safe_float(row.get(value_key)) is not None and safe_float(row.get(value_key)) > 0]
+    if len(usable) < 2:
+        return None
+    end = usable[-1]
+    start_index = max(0, len(usable) - max_years - 1)
+    start = usable[start_index]
+    start_value = safe_float(start.get(value_key))
+    end_value = safe_float(end.get(value_key))
+    if not start_value or not end_value:
+        return None
+    try:
+        years = max(1.0, (date.fromisoformat(end["period_end"]) - date.fromisoformat(start["period_end"])).days / 365.25)
+    except (TypeError, ValueError):
+        years = max(1.0, len(usable) - start_index - 1)
+    return (end_value / start_value) ** (1 / years) - 1
+
+
+def assumption_float(company: dict[str, Any], key: str) -> float | None:
+    return safe_float((company.get("manual_assumptions", {}) or {}).get(key))
+
+
+def valuation_features(
+    current: float | None,
+    fundamentals: dict[str, Any],
+    market: dict[str, Any],
+    company: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    company = company or {}
     metrics = fundamentals.get("metrics", {})
+    revenue_history = manual_history(company, "revenue_history", "revenue") or fundamentals.get("revenue_history", [])
+    share_history = manual_history(company, "share_history", "shares") or fundamentals.get("share_history", [])
     revenue = safe_float((metrics.get("revenue") or {}).get("value"))
+    if revenue is None and revenue_history:
+        revenue = safe_float(revenue_history[-1].get("revenue"))
     net_income = safe_float((metrics.get("net_income") or {}).get("value"))
     shares = safe_float((metrics.get("shares_outstanding") or metrics.get("weighted_diluted_shares") or {}).get("value"))
+    if shares is None and share_history:
+        shares = safe_float(share_history[-1].get("shares"))
     market_cap = safe_float(market.get("market_cap"))
     if not market_cap and current and shares:
         market_cap = current * shares
+    derived_revenue_cagr = cagr_from_history(revenue_history, "revenue")
+    derived_share_change_cagr = cagr_from_history(share_history, "shares")
+    manual_revenue_cagr = assumption_float(company, "revenue_forecast_cagr")
+    manual_share_change_cagr = assumption_float(company, "share_change_cagr")
+    revenue_cagr = manual_revenue_cagr if manual_revenue_cagr is not None else derived_revenue_cagr
+    revenue_cagr_source = "manual_assumptions" if manual_revenue_cagr is not None else "revenue_history"
+    share_change_cagr = manual_share_change_cagr if manual_share_change_cagr is not None else derived_share_change_cagr
+    share_change_source = "manual_assumptions" if manual_share_change_cagr is not None else "share_history"
+    assumptions = []
+    if revenue_cagr is None:
+        revenue_cagr = 0.06
+        revenue_cagr_source = "baseline"
+        assumptions.append("Revenue forecast CAGR unavailable; using baseline 6.0%.")
+    else:
+        unclamped = revenue_cagr
+        revenue_cagr = clamp(revenue_cagr, -0.20, 0.25)
+        if revenue_cagr != unclamped:
+            assumptions.append("Revenue forecast CAGR clamped to the model range of -20.0% to 25.0%.")
+    if share_change_cagr is None:
+        share_change_cagr = 0.0
+        share_change_source = "flat_default"
+        assumptions.append("Share count forecast unavailable; assuming no issuance or buyback.")
     return {
         "market_cap": market_cap,
+        "current_price": current,
+        "latest_revenue": revenue,
         "shares_outstanding": shares,
+        "revenue_history": revenue_history,
+        "share_history": share_history,
+        "revenue_forecast_cagr": revenue_cagr,
+        "revenue_forecast_cagr_source": revenue_cagr_source,
+        "share_change_cagr": share_change_cagr,
+        "share_change_cagr_source": share_change_source,
+        "valuation_assumptions": assumptions,
         "price_to_sales": market_cap / revenue if market_cap and revenue and revenue > 0 else None,
         "price_to_earnings": market_cap / net_income if market_cap and net_income and net_income > 0 else None,
         "gross_margin": safe_float((metrics.get("gross_margin") or {}).get("value")),
@@ -557,6 +699,7 @@ HORIZONS = [
 
 def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
     ticker = ticker.upper()
+    company = read_json(company_path(ticker), {"ticker": ticker})
     prices = get_prices(ticker)
     if not prices:
         refresh_ticker(ticker)
@@ -571,7 +714,7 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
     returns = daily_returns(prices)
     vol = annualized_volatility(returns)
     event_risk = estimate_event_risk(market)
-    valuation = valuation_features(current, fundamentals, market)
+    valuation = valuation_features(current, fundamentals, market, company)
     analyst = market.get("analyst_targets", {})
     features = {
         "technical": {
@@ -592,16 +735,21 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
     }
     warnings = []
     warnings.extend(fundamentals.get("warnings", []))
+    warnings.extend(valuation.get("valuation_assumptions", []))
     if len(prices) < 252:
         warnings.append("Insufficient one-year price history; confidence reduced.")
     if analyst.get("target_mean") is None:
         warnings.append("Analyst target data unavailable.")
     if valuation["price_to_sales"] is None:
         warnings.append("Price-to-sales unavailable due to missing revenue or market cap.")
+    if not valuation.get("revenue_history"):
+        warnings.append("Revenue history unavailable; revenue forecast uses the documented fallback or manual override.")
 
     horizons = {}
+    calculation_trace = {"formulas": valuation_model_spec()["formulas"], "horizons": {}}
     for spec in HORIZONS:
         horizons[spec.name] = forecast_horizon(spec, current, prices, features, warnings)
+        calculation_trace["horizons"][spec.name] = horizons[spec.name].get("calculation")
 
     forecast_id = uuid.uuid4().hex[:12]
     payload = {
@@ -619,6 +767,8 @@ def generate_forecast(ticker: str, persist: bool = True) -> dict[str, Any]:
         "current_price": current,
         "horizons": horizons,
         "features": features,
+        "valuation_model": valuation_model_spec(),
+        "calculation_trace": calculation_trace,
         "assumptions": [
             "Intervals are scenario ranges for personal decision support, not trading instructions.",
             "Short horizons emphasize empirical price action; long horizons emphasize fundamentals and valuation.",
@@ -647,19 +797,23 @@ def forecast_horizon(
     tech = features["technical"]
     momentum = average_present([tech.get("return_20d"), tech.get("return_65d"), tech.get("return_252d")])
     ma_bias = average_present([tech.get("ma_50_position"), tech.get("ma_200_position")])
-    technical_base = average_present([p50, momentum * min(1.0, spec.years) if momentum is not None else None, ma_bias])
+    scaled_momentum = momentum * min(1.0, spec.years) if momentum is not None else None
+    technical_base = average_present([p50, scaled_momentum, ma_bias])
     if technical_base is None:
         technical_base = 0.0
 
-    fundamental_cagr = estimate_fundamental_cagr(features)
+    fundamental_components = estimate_fundamental_components(features)
+    fundamental_cagr = fundamental_components["fundamental_cagr"]
     fundamental_return = (1 + fundamental_cagr) ** spec.years - 1
     analyst_return = analyst_expected_return(current, features.get("analyst_targets", {}), spec)
+    analyst_weight = None
     blend_items = [
         (technical_base, spec.technical_weight),
         (fundamental_return, 1 - spec.technical_weight),
     ]
     if analyst_return is not None and spec.name in {"13w", "1y"}:
-        blend_items.append((analyst_return, 0.20 if spec.name == "1y" else 0.08))
+        analyst_weight = 0.20 if spec.name == "1y" else 0.08
+        blend_items.append((analyst_return, analyst_weight))
     base_return = weighted_average(blend_items)
 
     volatility = features["technical"].get("annualized_volatility")
@@ -675,6 +829,49 @@ def forecast_horizon(
 
     confidence = confidence_score(spec, len(prices), features, warnings)
     target_date = add_trading_day_approx(date.today(), spec.trading_days).isoformat()
+    fundamental = features["fundamental"]
+    latest_revenue = safe_float(fundamental.get("latest_revenue"))
+    shares = safe_float(fundamental.get("shares_outstanding"))
+    revenue_cagr = safe_float(fundamental.get("revenue_forecast_cagr")) or 0.0
+    share_change_cagr = safe_float(fundamental.get("share_change_cagr")) or 0.0
+    revenue_forecast = latest_revenue * ((1 + revenue_cagr) ** spec.years) if latest_revenue is not None else None
+    forecast_shares = shares * ((1 + share_change_cagr) ** spec.years) if shares is not None else None
+    share_change_effect = shares / forecast_shares - 1 if shares and forecast_shares else None
+    blend_present = [(value, weight) for value, weight in blend_items if value is not None and math.isfinite(value)]
+    total_weight = sum(weight for _, weight in blend_present)
+    calculation = {
+        "target_date": target_date,
+        "current_price": current,
+        "years": spec.years,
+        "rolling_window_days": min(spec.trading_days, max(20, len(prices) // 4)),
+        "rolling_return_p05": p05,
+        "rolling_return_p50": p50,
+        "rolling_return_p95": p95,
+        "momentum_return": momentum,
+        "scaled_momentum_return": scaled_momentum,
+        "moving_average_bias": ma_bias,
+        "technical_return": technical_base,
+        "revenue_forecast": revenue_forecast,
+        "forecast_shares": forecast_shares,
+        "share_change_effect": share_change_effect,
+        "fundamental_components": fundamental_components,
+        "fundamental_return": fundamental_return,
+        "analyst_return": analyst_return,
+        "technical_weight": spec.technical_weight,
+        "fundamental_weight": 1 - spec.technical_weight,
+        "analyst_weight": analyst_weight,
+        "blend_total_weight": total_weight,
+        "base_return": base_return,
+        "volatility": volatility,
+        "volatility_used": volatility or 0.45,
+        "vol_band": vol_band,
+        "empirical_low": empirical_low,
+        "empirical_high": empirical_high,
+        "event_risk_widening": features["event_risk"]["interval_widening"],
+        "lower_return": lower_return,
+        "upper_return": upper_return,
+        "confidence": confidence,
+    }
     return {
         "target_date": target_date,
         "lower": round(max(0.01, current * (1 + lower_return)), 2),
@@ -682,6 +879,7 @@ def forecast_horizon(
         "upper": round(max(0.01, current * (1 + upper_return)), 2),
         "confidence": confidence,
         "confidence_label": confidence_label(confidence),
+        "calculation": calculation,
         "drivers": {
             "technical_weight": spec.technical_weight,
             "fundamental_weight": round(1 - spec.technical_weight, 2),
@@ -706,22 +904,68 @@ def weighted_average(items: list[tuple[float | None, float]]) -> float:
     return sum(value * weight for value, weight in present) / total
 
 
-def estimate_fundamental_cagr(features: dict[str, Any]) -> float:
+def estimate_fundamental_components(features: dict[str, Any]) -> dict[str, Any]:
     fundamental = features["fundamental"]
+    revenue_cagr = safe_float(fundamental.get("revenue_forecast_cagr"))
+    if revenue_cagr is None:
+        revenue_cagr = 0.06
+    share_change_cagr = safe_float(fundamental.get("share_change_cagr"))
+    if share_change_cagr is None:
+        share_change_cagr = 0.0
     margin = fundamental.get("net_margin")
     balance = fundamental.get("balance_sheet_strength")
     ps = fundamental.get("price_to_sales")
-    cagr = 0.06
+    margin_adjustment = 0.0
     if margin is not None:
-        cagr += max(-0.04, min(0.08, margin * 0.25))
+        margin_adjustment = clamp(margin * 0.25, -0.04, 0.08)
+    balance_sheet_adjustment = 0.0
     if balance is not None:
-        cagr += max(-0.03, min(0.03, balance * 0.05))
+        balance_sheet_adjustment = clamp(balance * 0.05, -0.03, 0.03)
+    valuation_adjustment = 0.0
     if ps is not None:
         if ps > 20:
-            cagr -= 0.04
+            valuation_adjustment = -0.04
         elif ps < 5:
-            cagr += 0.02
-    return max(-0.20, min(0.25, cagr))
+            valuation_adjustment = 0.02
+    raw_cagr = revenue_cagr - share_change_cagr + margin_adjustment + balance_sheet_adjustment + valuation_adjustment
+    return {
+        "revenue_cagr": revenue_cagr,
+        "share_change_cagr": share_change_cagr,
+        "margin_adjustment": margin_adjustment,
+        "balance_sheet_adjustment": balance_sheet_adjustment,
+        "valuation_adjustment": valuation_adjustment,
+        "raw_fundamental_cagr": raw_cagr,
+        "fundamental_cagr": clamp(raw_cagr, -0.20, 0.25),
+    }
+
+
+def estimate_fundamental_cagr(features: dict[str, Any]) -> float:
+    return estimate_fundamental_components(features)["fundamental_cagr"]
+
+
+def valuation_model_spec() -> dict[str, Any]:
+    return {
+        "model_version": MODEL_VERSION,
+        "horizons": [
+            {"name": spec.name, "trading_days": spec.trading_days, "years": spec.years, "technical_weight": spec.technical_weight}
+            for spec in HORIZONS
+        ],
+        "formulas": {
+            "revenue_forecast": "latest_revenue * (1 + revenue_cagr) ^ years",
+            "forecast_shares": "current_shares * (1 + share_change_cagr) ^ years",
+            "share_change_effect": "current_shares / forecast_shares - 1",
+            "fundamental_cagr": "revenue_cagr - share_change_cagr + margin_adjustment + balance_sheet_adjustment + valuation_adjustment",
+            "fundamental_return": "(1 + fundamental_cagr) ^ years - 1",
+            "technical_return": "average(rolling_return_p50, average(return_20d, return_65d, return_252d) * min(1, years), average(ma_50_position, ma_200_position))",
+            "base_return": "weighted_average(technical_return * technical_weight, fundamental_return * fundamental_weight, analyst_return * analyst_weight when available)",
+            "base_price": "current_price * (1 + base_return)",
+            "vol_band": "annualized_volatility * sqrt(years) * 1.65",
+            "lower_return": "min(empirical_p05, base_return - vol_band * (1 + event_risk_widening))",
+            "upper_return": "max(empirical_p95, base_return + vol_band * (1 + event_risk_widening))",
+            "lower_price": "current_price * (1 + lower_return)",
+            "upper_price": "current_price * (1 + upper_return)",
+        },
+    }
 
 
 def analyst_expected_return(current: float, analyst: dict[str, Any], spec: HorizonSpec) -> float | None:
@@ -1027,10 +1271,16 @@ def company_detail(ticker: str) -> dict[str, Any]:
     company = read_json(company_path(ticker), {"ticker": ticker})
     prices = get_prices(ticker)
     metrics = latest_metrics(ticker)
+    live_forecast = None
+    try:
+        live_forecast = generate_forecast(ticker, persist=False)
+    except Exception as exc:
+        live_forecast = {"error": f"{type(exc).__name__}: {exc}"}
     return {
         "company": company,
         "prices": prices[-400:],
         "metrics": metrics,
+        "live_forecast": live_forecast,
         "forecasts": load_forecasts(ticker),
         "histogram": histogram(ticker),
     }
@@ -1074,6 +1324,8 @@ def company_signal(ticker: str) -> dict[str, Any] | None:
         },
         "horizons": forecast.get("horizons", {}),
         "features": forecast.get("features", {}),
+        "valuation_model": forecast.get("valuation_model", {}),
+        "calculation_trace": forecast.get("calculation_trace", {}),
         "warnings": forecast.get("warnings", []),
         "spark": spark,
     }
